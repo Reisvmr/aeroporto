@@ -1,93 +1,63 @@
-# Aeroporto
+# Projeto Aeroporto - Zabbix, Ansible AWX e Grafana
 
+Repositório para centralizar os documentos, cronogramas e artefatos do projeto de implantação da solução de monitoramento e automação para 676 ativos.
 
+## Objetivo
 
-## Getting started
+Implantar uma plataforma de monitoramento baseada em Zabbix 7.0 LTS, PostgreSQL 16, Grafana e Ansible AWX, com arquitetura em alta disponibilidade, retenção de dados de 180 dias e automação de onboarding, validação, backup, restore e mudanças de rede.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Escopo Atual
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- 676 dispositivos no escopo.
+- Coleta majoritariamente via SNMP.
+- Ativos contemplados: rede, câmeras, controladoras, storages e servidores.
+- Retenção adotada: 180 dias.
+- Volume histórico estimado: aproximadamente 316 GB úteis.
+- PostgreSQL dedicado em arquitetura Primary/Replica.
+- Storage NVMe obrigatório para o banco.
+- Zabbix, Frontend, Grafana, AWX e VIP organizados em camadas com HA ativo/standby.
 
-## Add your files
+## Estrutura do Repositório
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```text
+docs/
+  propostas/      Documentos de proposta e plano executivo.
+  cronogramas/    Planilhas de cronograma, Gantt, WBS, RACI e riscos.
+  referencias/    Anexos, materiais base e referências técnicas.
+planejamento/     Materiais auxiliares de execução do projeto.
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/Reisvmr/aeroporto.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+## Entregáveis Iniciais
 
-* [Set up project integrations](https://gitlab.com/Reisvmr/aeroporto/-/settings/integrations)
+- `docs/propostas/Proposta_Execucao_Monitoramento_676_Ativos_AWX_V3_Disponibilidade.docx`
+- `docs/cronogramas/Cronograma_Gantt_Monitoramento_676_Ativos_AWX_V3_Disponibilidade.xlsx`
 
-## Collaborate with your team
+## Restrições de Disponibilidade
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+O planejamento considera a disponibilidade real do executor:
 
-## Test and Deploy
+- Segunda-feira: home office, ideal para blocos técnicos profundos.
+- Terça a quinta-feira: presencial, com aproximadamente 4 horas de deslocamento por dia.
+- Sexta-feira: home office, ideal para execução concentrada, fechamento de pendências e status report.
 
-Use the built-in continuous integration in GitLab.
+Atividades críticas de arquitetura, automação, análise de erros, documentação e ajustes de templates devem ser priorizadas às segundas e sextas-feiras. Terça a quinta devem ser usadas preferencialmente para alinhamentos, validações presenciais, remoção de bloqueios e aprovações.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+## Cronograma Executivo
 
-***
+O plano atual propõe execução comprimida em 6 semanas a partir de 15/08/2026, condicionada à disponibilidade de:
 
-# Editing this README
+- inventário validado dos 676 ativos;
+- VPN e conectividade;
+- credenciais SNMP, SSH/Telnet, sistema operacional e banco;
+- liberação de portas;
+- VMs provisionadas conforme sizing aprovado;
+- janelas para mudanças de rede;
+- aprovações rápidas de arquitetura, piloto e ondas.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Próximos Passos
 
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1. Validar o plano V3 com a gerência.
+2. Confirmar se o cronograma de 6 semanas será apresentado como meta condicionada.
+3. Consolidar anexos técnicos finais na pasta `docs/referencias/`.
+4. Definir branch e estratégia de versionamento dos documentos.
+5. Confirmar se os arquivos devem ser commitados e enviados para o GitLab.
