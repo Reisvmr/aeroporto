@@ -56,7 +56,7 @@ sudo yum install -y \
 # Ubuntu/Debian
 sudo apt-get install -y \
   wget curl git vim nano htop net-tools \
-  ntp ntpdate chrony \
+  chrony \
   build-essential \
   libssl-dev
 ```
