@@ -1,0 +1,54 @@
+---
+# Playbook: Teste de Conectividade
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Objetivo: Verificar conectividade de todos os dispositivos
+
+- name: "Connectivity Test"
+  hosts: cameras,access_control,gates,uvss,infrastructure
+  gather_facts: yes
+  
+  vars:
+    ping_count: 5
+    timeout: 10
+
+  tasks:
+    - name: "Teste de ping ICMP"
+      ping:
+      register: ping_result
+      ignore_errors: yes
+
+    - name: "Teste de porta HTTP"
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ camera_http_port | default(80) }}"
+        timeout: "{{ timeout }}"
+      register: http_test
+      ignore_errors: yes
+
+    - name: "Teste de porta HTTPS"
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ camera_https_port | default(443) }}"
+        timeout: "{{ timeout }}"
+      register: https_test
+      ignore_errors: yes
+
+    - name: "Sumário de conectividade"
+      debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          ICMP: {% if ping_result is succeeded %}✓{% else %}✗{% endif %}
+          HTTP: {% if http_test is succeeded %}✓{% else %}✗{% endif %}
+          HTTPS: {% if https_test is succeeded %}✓{% else %}✗{% endif %}
+
+    - name: "Registrar resultado"
+      copy:
+        content: |
+          Host: {{ inventory_hostname }}
+          Timestamp: {{ ansible_now() }}
+          ICMP: {% if ping_result is succeeded %}OK{% else %}FAILED{% endif %}
+          HTTP: {% if http_test is succeeded %}OK{% else %}FAILED{% endif %}
+          HTTPS: {% if https_test is succeeded %}OK{% else %}FAILED{% endif %}
+        dest: "/tmp/connectivity_{{ inventory_hostname }}.log"

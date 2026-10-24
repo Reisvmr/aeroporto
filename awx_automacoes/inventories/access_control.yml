@@ -1,0 +1,72 @@
+# Inventário Ansible - Sistemas de Controle de Acesso
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Total de sistemas: 240
+
+all:
+  children:
+    access_control:
+      hosts:
+        # Sistema Principal - Controle Central
+        access_central_01:
+          ansible_host: 192.168.2.10
+          ansible_user: admin
+          location: "Sala de Controle - Piso 1"
+          access_type: "central_controller"
+          db_host: "10.31.38.64"
+          db_port: 5432
+          db_name: "access_control"
+          
+        # Leitores de Biometria - Entrada
+        access_bio_entrada_01:
+          ansible_host: 192.168.2.101
+          ansible_user: admin
+          location: "Entrada Principal - Catraca 1"
+          access_type: "biometric_reader"
+          device_group: "entrance"
+          
+        access_bio_entrada_02:
+          ansible_host: 192.168.2.102
+          ansible_user: admin
+          location: "Entrada Principal - Catraca 2"
+          access_type: "biometric_reader"
+          device_group: "entrance"
+        
+        # Leitores de Cartão - Zona Administrativa
+        access_card_admin_01:
+          ansible_host: 192.168.2.201
+          ansible_user: admin
+          location: "Zona Administrativa - Porta 1"
+          access_type: "card_reader"
+          device_group: "administrative"
+          
+        access_card_admin_02:
+          ansible_host: 192.168.2.202
+          ansible_user: admin
+          location: "Zona Administrativa - Porta 2"
+          access_type: "card_reader"
+          device_group: "administrative"
+        
+        # Painéis de Controle - Diversos
+        access_panel_patio_01:
+          ansible_host: 192.168.2.301
+          ansible_user: admin
+          location: "Pátio de Estacionamento A"
+          access_type: "access_panel"
+          device_group: "parking"
+          
+        # Placeholder para mais sistemas
+        # access_XXXX_NN com IPs 192.168.2.XXX
+        # Total: 240 sistemas
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        sync_interval: 300
+        sync_timeout: 30
+        max_retries: 3
+        log_level: "info"
+        alert_on_sync_fail: true

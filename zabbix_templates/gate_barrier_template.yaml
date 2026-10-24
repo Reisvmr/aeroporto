@@ -1,0 +1,78 @@
+---
+# Template Zabbix - Monitoramento de Cancelas/Barreiras
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Versão: 1.0
+# Aplicável a: Cancelas e Barreiras (7 dispositivos)
+
+zabbix_export:
+  version: '5.4'
+  groups:
+    - name: "Gates"
+      uuid: "e0ca112dh9ga503f18e5eb1b0ah9h9h9"
+  
+  templates:
+    - name: "Cancela/Barreira - Monitoramento Completo"
+      description: "Template para monitorar cancelas e barreiras automáticas"
+      uuid: "f1db223ei0hb614g2f16fc2c1bi0i0i0"
+      group: "Gates"
+      
+      items:
+        # Status do Motor
+        - name: "Motor - Status"
+          type: "HTTP_AGENT"
+          key: "motor.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "Motor - Temperatura"
+          type: "SNMP_AGENT"
+          key: "motor.temperature"
+          delay: "120s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "FLOAT"
+          units: "°C"
+          
+        # Sensores
+        - name: "Sensor Fim de Curso - Aberta"
+          type: "HTTP_AGENT"
+          key: "sensor.open"
+          delay: "30s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "Sensor Fim de Curso - Fechada"
+          type: "HTTP_AGENT"
+          key: "sensor.closed"
+          delay: "30s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Tempo de Operação
+        - name: "Tempo de Abertura"
+          type: "HTTP_AGENT"
+          key: "gate.open_time"
+          delay: "300s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "FLOAT"
+          units: "s"
+          
+      triggers:
+        - name: "Cancela {HOST.NAME} - Falha de Movimento"
+          expression: |
+            {Cancela/Barreira - Monitoramento Completo:motor.status.eq(FAILED)}=1
+          severity: "HIGH"
+          enabled: "YES"
+          
+        - name: "Sensor Travado em {HOST.NAME}"
+          expression: |
+            ({Cancela/Barreira - Monitoramento Completo:sensor.open.eq(1)} and 
+             {Cancela/Barreira - Monitoramento Completo:sensor.closed.eq(1)})
+          severity: "AVERAGE"
+          enabled: "YES"

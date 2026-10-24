@@ -1,0 +1,92 @@
+# Inventário Ansible - Infraestrutura
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Servidores de Monitoramento e Automação
+
+all:
+  children:
+    infrastructure:
+      hosts:
+        # PostgreSQL - Banco Central
+        postgres_primary:
+          ansible_host: 10.31.38.64
+          ansible_user: root
+          location: "Data Center"
+          service_type: "database"
+          service_name: "PostgreSQL 16"
+          port: 5432
+          databases:
+            - name: "zabbix"
+              owner: "zabbix"
+            - name: "grafana"
+              owner: "grafana"
+            - name: "awx"
+              owner: "awx"
+        
+        # Zabbix Server
+        zabbix_server_01:
+          ansible_host: 10.31.38.60
+          ansible_user: root
+          location: "Data Center"
+          service_type: "monitoring"
+          service_name: "Zabbix Server 7.0 LTS"
+          port: 10051
+          db_host: "10.31.38.64"
+          db_port: 5432
+          db_name: "zabbix"
+        
+        # Zabbix Frontend
+        zabbix_frontend_01:
+          ansible_host: 10.31.38.62
+          ansible_user: root
+          location: "Data Center"
+          service_type: "monitoring"
+          service_name: "Zabbix Frontend"
+          port: 80
+          db_host: "10.31.38.64"
+          db_port: 5432
+          db_name: "zabbix"
+        
+        # AWX - Automação
+        awx_server_01:
+          ansible_host: 10.31.38.68
+          ansible_user: root
+          location: "Data Center"
+          service_type: "automation"
+          service_name: "AWX 22.x"
+          port: 8080
+          db_host: "10.31.38.64"
+          db_port: 5432
+          db_name: "awx"
+          docker_compose: true
+        
+        # Grafana - Visualização
+        grafana_server_01:
+          ansible_host: 10.31.38.66
+          ansible_user: root
+          location: "Data Center"
+          service_type: "visualization"
+          service_name: "Grafana 10.x"
+          port: 3000
+          db_host: "10.31.38.64"
+          db_port: 5432
+          db_name: "grafana"
+
+      vars:
+        # Variáveis comuns de infraestrutura
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        # Monitoramento
+        health_check_interval: 60
+        alert_on_down: true
+        alert_on_slow_response: true
+        response_timeout: 10
+        # Backup
+        backup_enabled: true
+        backup_retention_days: 30
+        backup_schedule: "0 2 * * *"
+        # Logs
+        log_aggregation: true
+        log_retention_days: 90

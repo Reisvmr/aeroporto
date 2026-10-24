@@ -1,0 +1,68 @@
+---
+# Template Zabbix - Monitoramento de Controle de Acesso
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Versão: 1.0
+# Aplicável a: Sistemas de Controle de Acesso (240 dispositivos)
+
+zabbix_export:
+  version: '5.4'
+  date: '2026-10-24T00:00:00Z'
+  groups:
+    - name: "Access Control"
+      uuid: "c9a8ff0bf7e8481d96c3c9f9f8f7f7f7"
+  
+  templates:
+    - name: "Controle de Acesso - Monitoramento Completo"
+      description: "Template para monitorar sistemas de controle de acesso"
+      uuid: "d0b9001cg8f9492e07d4da0a09g8g8g8"
+      group: "Access Control"
+      
+      items:
+        # Conectividade
+        - name: "Ping (ICMP)"
+          type: "SIMPLE_SNMP_CHECK"
+          key: "icmpping"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Acesso ao Banco de Dados
+        - name: "Banco de Dados - Conectividade"
+          type: "CALCULATED"
+          key: "db.connectivity"
+          delay: "300s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Sincronização de Permissões
+        - name: "Sincronização - Última Execução"
+          type: "DEPENDENT_ITEM"
+          key: "sync.last_exec"
+          delay: "0s"
+          history: "30d"
+          status: "ACTIVE"
+          depends_on: "icmpping"
+          
+        - name: "Sincronização - Status"
+          type: "HTTP_AGENT"
+          key: "sync.status"
+          delay: "600s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "TEXT"
+          
+      triggers:
+        - name: "Controle de Acesso {HOST.NAME} está OFFLINE"
+          expression: |
+            {Controle de Acesso - Monitoramento Completo:icmpping.nodata(300)}=1
+          severity: "HIGH"
+          enabled: "YES"
+          
+        - name: "Falha de Sincronização em {HOST.NAME}"
+          expression: |
+            {Controle de Acesso - Monitoramento Completo:sync.status.str(FAILED)}=1
+          severity: "AVERAGE"
+          enabled: "YES"

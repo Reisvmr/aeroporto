@@ -1,0 +1,64 @@
+# Inventário Ansible - Câmeras IP
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Total de câmeras: 382
+
+all:
+  children:
+    cameras:
+      hosts:
+        # Câmeras Zona 1 (Entrada Principal)
+        camera_entrada_01:
+          ansible_host: 192.168.1.101
+          ansible_user: admin
+          location: "Entrada Principal"
+          zone: "zona_1"
+          camera_type: "dome"
+          
+        camera_entrada_02:
+          ansible_host: 192.168.1.102
+          ansible_user: admin
+          location: "Entrada Principal"
+          zone: "zona_1"
+          camera_type: "dome"
+        
+        # Câmeras Zona 2 (Pátio de Estacionamento)
+        camera_patios_01:
+          ansible_host: 192.168.1.201
+          ansible_user: admin
+          location: "Pátio de Estacionamento A"
+          zone: "zona_2"
+          camera_type: "turret"
+          
+        camera_patios_02:
+          ansible_host: 192.168.1.202
+          ansible_user: admin
+          location: "Pátio de Estacionamento A"
+          zone: "zona_2"
+          camera_type: "turret"
+        
+        # Câmeras Zona 3 (Corredor de Acesso)
+        camera_corredor_01:
+          ansible_host: 192.168.1.301
+          ansible_user: admin
+          location: "Corredor de Acesso"
+          zone: "zona_3"
+          camera_type: "box"
+          
+        # Exemplo de placeholder para mais câmeras
+        # camera_XXXX_NN com IPs 192.168.1.XXX
+        # Total: 382 câmeras (exemplo mostra 5 reais + padrão para mais)
+
+      vars:
+        # Variáveis comuns para todas as câmeras
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        camera_http_port: 80
+        camera_https_port: 443
+        camera_rtsp_port: 554
+        ntp_server: "10.31.38.60"
+        dns_servers:
+          - "8.8.8.8"
+          - "8.8.4.4"

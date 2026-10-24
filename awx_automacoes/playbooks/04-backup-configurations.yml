@@ -1,0 +1,48 @@
+---
+# Playbook: Backup de Configurações
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Objetivo: Fazer backup de configurações de todos os dispositivos
+
+- name: "Backup Configurations"
+  hosts: cameras,access_control,gates,uvss
+  become: yes
+  
+  vars:
+    backup_dir: "/backups/{{ inventory_hostname }}"
+    backup_retention_days: 30
+
+  tasks:
+    - name: "Criar diretório de backup local"
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: "Fazer backup de configurações"
+      uri:
+        url: "http://{{ ansible_host }}/api/config/backup"
+        method: GET
+        creates: "{{ backup_dir }}/config_{{ ansible_date_time.iso8601_basic_short }}.tar.gz"
+      register: backup_result
+      ignore_errors: yes
+
+    - name: "Registrar backup"
+      copy:
+        content: "Backup: {{ inventory_hostname }} em {{ ansible_now() }}
+"
+        dest: "{{ backup_dir }}/BACKUP_LOG.txt"
+      when: backup_result is succeeded
+
+    - name: "Limpar backups antigos (>30 dias)"
+      find:
+        path: "{{ backup_dir }}"
+        age: "{{ backup_retention_days }}d"
+        patterns: "config_*.tar.gz"
+      register: old_backups
+
+    - name: "Remover backups antigos"
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"

@@ -1,0 +1,60 @@
+---
+# Playbook: Reiniciar Serviços que Falharam
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Objetivo: Monitoramento reativo - reiniciar serviços quando caem
+
+- name: "Restart Failed Services"
+  hosts: cameras,access_control,gates,uvss,infrastructure
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    max_restart_attempts: 3
+    restart_wait_seconds: 30
+    service_check_timeout: 10
+
+  tasks:
+    - name: "Verificar status do serviço de câmera"
+      uri:
+        url: "http://{{ ansible_host }}:{{ camera_http_port | default(80) }}/health"
+        method: GET
+        timeout: "{{ service_check_timeout }}"
+        status_code: [200]
+      register: service_health
+      ignore_errors: yes
+      changed_when: false
+
+    - name: "Serviço está down - iniciar reinício"
+      block:
+        - name: "Tentativa {{ item }} de reinício"
+          uri:
+            url: "http://{{ ansible_host }}/api/system/reboot"
+            method: POST
+            timeout: 10
+          register: restart_result
+          ignore_errors: yes
+          loop: "{{ range(1, max_restart_attempts + 1) | list }}"
+
+        - name: "Aguardar serviço voltar online"
+          wait_for:
+            host: "{{ ansible_host }}"
+            port: "{{ camera_http_port | default(80) }}"
+            timeout: 60
+            state: started
+          register: service_recovery
+          ignore_errors: yes
+
+        - name: "Registrar recuperação bem-sucedida"
+          copy:
+            content: "{{ inventory_hostname }}: RECUPERADO em {{ ansible_now() }}
+"
+            dest: "/tmp/service_recovered_{{ inventory_hostname }}.log"
+          when: service_recovery is succeeded
+
+      when: service_health is failed
+
+    - name: "Serviço OK - nenhuma ação necessária"
+      debug:
+        msg: "{{ inventory_hostname }} está funcionando normalmente"
+      when: service_health is succeeded

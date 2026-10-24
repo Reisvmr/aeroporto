@@ -1,0 +1,70 @@
+# Inventário Ansible - UVSS (Under Vehicle Scanning)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Total de sistemas: 4
+
+all:
+  children:
+    uvss:
+      hosts:
+        # UVSS - Entrada Veículos
+        uvss_entrada_01:
+          ansible_host: 192.168.4.10
+          ansible_user: admin
+          location: "Rampa Entrada Veículos"
+          uvss_type: "under_vehicle_scan"
+          camera_resolution: "8MP"
+          scan_speed: "20km/h"
+          database_host: "10.31.38.64"
+          database_port: 5432
+          database_name: "uvss_database"
+          
+        # UVSS - Saída Veículos
+        uvss_saida_01:
+          ansible_host: 192.168.4.11
+          ansible_user: admin
+          location: "Rampa Saída Veículos"
+          uvss_type: "under_vehicle_scan"
+          camera_resolution: "8MP"
+          scan_speed: "20km/h"
+          database_host: "10.31.38.64"
+          database_port: 5432
+          database_name: "uvss_database"
+        
+        # UVSS - Zona Administrativa (Verificação de Integridade)
+        uvss_admin_01:
+          ansible_host: 192.168.4.20
+          ansible_user: admin
+          location: "Acesso Zona Administrativa"
+          uvss_type: "under_vehicle_scan"
+          camera_resolution: "8MP"
+          scan_speed: "15km/h"
+          database_host: "10.31.38.64"
+          database_port: 5432
+          database_name: "uvss_database"
+          
+        # UVSS - Pátio de Estacionamento (Verificação de Integridade)
+        uvss_patio_01:
+          ansible_host: 192.168.4.21
+          ansible_user: admin
+          location: "Pátio de Estacionamento"
+          uvss_type: "under_vehicle_scan"
+          camera_resolution: "8MP"
+          scan_speed: "15km/h"
+          database_host: "10.31.38.64"
+          database_port: 5432
+          database_name: "uvss_database"
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        image_processing_timeout: 60
+        db_sync_interval: 300
+        alert_on_anomaly: true
+        alert_on_db_fail: true
+        log_images: true
+        image_retention_days: 90
+        ai_model_version: "1.0"

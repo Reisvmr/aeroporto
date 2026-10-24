@@ -1,0 +1,80 @@
+# Inventário Ansible - Cancelas/Barreiras
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Total de cancelas: 7
+
+all:
+  children:
+    gates:
+      hosts:
+        # Cancela de Entrada - Veículos
+        gate_entrada_veiculo_01:
+          ansible_host: 192.168.3.10
+          ansible_user: admin
+          location: "Entrada Veículos - Rampa 1"
+          gate_type: "vehicle_barrier"
+          motor_type: "hydraulic"
+          motor_power: 3000
+          
+        gate_entrada_veiculo_02:
+          ansible_host: 192.168.3.11
+          ansible_user: admin
+          location: "Entrada Veículos - Rampa 2"
+          gate_type: "vehicle_barrier"
+          motor_type: "hydraulic"
+          motor_power: 3000
+        
+        # Cancela de Saída - Veículos
+        gate_saida_veiculo_01:
+          ansible_host: 192.168.3.20
+          ansible_user: admin
+          location: "Saída Veículos - Rampa"
+          gate_type: "vehicle_barrier"
+          motor_type: "hydraulic"
+          motor_power: 3000
+        
+        # Torniquete - Acesso Pedestre
+        gate_torniquete_01:
+          ansible_host: 192.168.3.30
+          ansible_user: admin
+          location: "Acesso Pedestre - Entrada"
+          gate_type: "turnstile"
+          motor_type: "electric"
+          motor_power: 500
+          
+        gate_torniquete_02:
+          ansible_host: 192.168.3.31
+          ansible_user: admin
+          location: "Acesso Pedestre - Saída"
+          gate_type: "turnstile"
+          motor_type: "electric"
+          motor_power: 500
+        
+        # Porta Deslizante Automática
+        gate_deslizante_01:
+          ansible_host: 192.168.3.40
+          ansible_user: admin
+          location: "Acesso Zona Administrativa"
+          gate_type: "sliding_door"
+          motor_type: "electric"
+          motor_power: 1000
+          
+        gate_deslizante_02:
+          ansible_host: 192.168.3.41
+          ansible_user: admin
+          location: "Acesso Sala de Controle"
+          gate_type: "sliding_door"
+          motor_type: "electric"
+          motor_power: 1000
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        gate_timeout: 30
+        sensor_check_interval: 10
+        alert_on_failure: true
+        alert_on_timeout: true
+        max_open_time: 120

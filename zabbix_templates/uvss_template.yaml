@@ -1,0 +1,96 @@
+---
+# Template Zabbix - Monitoramento de UVSS (Under Vehicle Scanning)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Versão: 1.0
+# Aplicável a: UVSS (4 dispositivos)
+
+zabbix_export:
+  version: '5.4'
+  groups:
+    - name: "UVSS"
+      uuid: "g2ec334fj0ic725h3g27gd3d2cj0j0j0"
+  
+  templates:
+    - name: "UVSS - Monitoramento Completo"
+      description: "Template para monitorar sistemas UVSS (Under Vehicle Scanning)"
+      uuid: "h3fd445gk1jd836i4h38he4e3dk1k1k1"
+      group: "UVSS"
+      
+      items:
+        # Status do Sistema
+        - name: "UVSS - Status Geral"
+          type: "HTTP_AGENT"
+          key: "uvss.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Câmera/Sensor
+        - name: "Câmera - Status"
+          type: "HTTP_AGENT"
+          key: "camera.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "Câmera - Temperatura"
+          type: "SNMP_AGENT"
+          key: "camera.temperature"
+          delay: "120s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "FLOAT"
+          units: "°C"
+          
+        # Processamento de Imagens
+        - name: "Processamento - Tempo Médio"
+          type: "HTTP_AGENT"
+          key: "processing.avg_time"
+          delay: "300s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "FLOAT"
+          units: "ms"
+          
+        - name: "Processamento - Taxa de Sucesso"
+          type: "HTTP_AGENT"
+          key: "processing.success_rate"
+          delay: "600s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "FLOAT"
+          units: "%"
+          
+        # Banco de Dados
+        - name: "Banco de Dados - Status"
+          type: "HTTP_AGENT"
+          key: "db.status"
+          delay: "300s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "Banco de Dados - Tamanho"
+          type: "DEPENDENT_ITEM"
+          key: "db.size"
+          delay: "0s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          units: "bytes"
+          
+      triggers:
+        - name: "UVSS {HOST.NAME} está OFFLINE"
+          expression: |
+            {UVSS - Monitoramento Completo:uvss.status.eq(OFFLINE)}=1
+          severity: "HIGH"
+          enabled: "YES"
+          
+        - name: "Falha de Processamento em {HOST.NAME}"
+          expression: |
+            {UVSS - Monitoramento Completo:processing.success_rate.last()}<95
+          severity: "AVERAGE"
+          enabled: "YES"

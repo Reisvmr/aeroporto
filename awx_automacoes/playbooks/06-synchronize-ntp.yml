@@ -1,0 +1,41 @@
+---
+# Playbook: Sincronizar NTP em Todos os Dispositivos
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Objetivo: Garantir sincronização de hora em toda infraestrutura
+
+- name: "Synchronize NTP"
+  hosts: cameras,access_control,gates,uvss,infrastructure
+  become: yes
+
+  vars:
+    ntp_server: "10.31.38.60"
+    ntp_check_interval: 3600
+
+  tasks:
+    - name: "Sincronizar hora via NTP"
+      uri:
+        url: "http://{{ ansible_host }}/api/system/ntp/sync"
+        method: POST
+        body_format: json
+        body:
+          server: "{{ ntp_server }}"
+          interval: "{{ ntp_check_interval }}"
+      ignore_errors: yes
+      register: ntp_sync
+
+    - name: "Verificar diferença horária"
+      shell: "ntpq -p {{ ntp_server }} 2>/dev/null | grep -oE '[0-9]+ms' | head -1"
+      register: time_offset
+      changed_when: false
+      ignore_errors: yes
+
+    - name: "Registrar sincronização"
+      copy:
+        content: |
+          Host: {{ inventory_hostname }}
+          NTP Server: {{ ntp_server }}
+          Status: {% if ntp_sync is succeeded %}OK{% else %}FAILED{% endif %}
+          Time Offset: {{ time_offset.stdout | default('unknown') }}
+          Timestamp: {{ ansible_now() }}
+        dest: "/tmp/ntp_sync_{{ inventory_hostname }}.log"

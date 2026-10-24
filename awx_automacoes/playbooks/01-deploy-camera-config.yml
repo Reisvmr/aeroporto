@@ -1,0 +1,203 @@
+---
+# Playbook: Deploy Configuração de Câmeras IP
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Objetivo: Configurar câmeras IP em massa com parâmetros padronizados
+
+- name: "Deploy Configuração de Câmeras IP"
+  hosts: cameras
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Configurações de rede
+    ntp_server: "10.31.38.60"
+    dns_primary: "8.8.8.8"
+    dns_secondary: "8.8.4.4"
+    
+    # Configurações de câmera
+    camera_rtsp_port: 554
+    camera_http_port: 80
+    camera_https_port: 443
+    
+    # Configurações de segurança
+    camera_username: "admin"
+    camera_ssl_enabled: true
+    
+    # Configurações de armazenamento
+    retention_days: 30
+    video_resolution: "1080p"
+    frame_rate: 30
+    bitrate: "auto"
+
+  pre_tasks:
+    - name: "Validar conectividade com câmera"
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ camera_http_port }}"
+        timeout: 10
+        state: started
+      register: connectivity_check
+      changed_when: false
+      failed_when: false
+
+    - name: "Registrar resultado da conectividade"
+      set_fact:
+        camera_online: "{{ connectivity_check is succeeded }}"
+
+    - name: "Parar se câmera offline"
+      block:
+        - name: "Câmera offline - {{ ansible_host }}"
+          debug:
+            msg: "AVISO: Câmera {{ inventory_hostname }} em {{ ansible_host }} não está acessível"
+          
+        - name: "Registrar falha"
+          copy:
+            content: "{{ inventory_hostname }}: OFFLINE em {{ ansible_now() }}\n"
+            dest: "/tmp/camera_offline_{{ inventory_hostname }}.txt"
+      when: not camera_online
+
+  tasks:
+    - name: "Configurar NTP (Sincronização de Hora)"
+      block:
+        - name: "Enviar configuração NTP para câmera"
+          uri:
+            url: "http://{{ ansible_host }}/api/system/ntp"
+            method: POST
+            user: "{{ ansible_user }}"
+            password: "{{ ansible_password | default('admin') }}"
+            body_format: json
+            body:
+              enabled: true
+              server: "{{ ntp_server }}"
+              interval: 3600
+            status_code: [200, 201, 204]
+          register: ntp_result
+          when: camera_online
+          ignore_errors: yes
+
+        - name: "NTP configurado com sucesso"
+          debug:
+            msg: "NTP configurado em {{ inventory_hostname }}"
+          when: ntp_result is succeeded
+
+      rescue:
+        - name: "Falha ao configurar NTP"
+          debug:
+            msg: "AVISO: Falha ao configurar NTP em {{ inventory_hostname }}"
+
+    - name: "Configurar DNS"
+      block:
+        - name: "Enviar configuração DNS para câmera"
+          uri:
+            url: "http://{{ ansible_host }}/api/network/dns"
+            method: POST
+            user: "{{ ansible_user }}"
+            password: "{{ ansible_password | default('admin') }}"
+            body_format: json
+            body:
+              primary_dns: "{{ dns_primary }}"
+              secondary_dns: "{{ dns_secondary }}"
+            status_code: [200, 201, 204]
+          register: dns_result
+          when: camera_online
+          ignore_errors: yes
+
+        - name: "DNS configurado com sucesso"
+          debug:
+            msg: "DNS configurado em {{ inventory_hostname }}"
+          when: dns_result is succeeded
+
+      rescue:
+        - name: "Falha ao configurar DNS"
+          debug:
+            msg: "AVISO: Falha ao configurar DNS em {{ inventory_hostname }}"
+
+    - name: "Configurar Armazenamento (Retention)"
+      block:
+        - name: "Enviar configuração de retenção"
+          uri:
+            url: "http://{{ ansible_host }}/api/recording/retention"
+            method: POST
+            user: "{{ ansible_user }}"
+            password: "{{ ansible_password | default('admin') }}"
+            body_format: json
+            body:
+              retention_days: "{{ retention_days }}"
+              resolution: "{{ video_resolution }}"
+              frame_rate: "{{ frame_rate }}"
+              bitrate: "{{ bitrate }}"
+            status_code: [200, 201, 204]
+          register: retention_result
+          when: camera_online
+          ignore_errors: yes
+
+        - name: "Retenção configurada com sucesso"
+          debug:
+            msg: "Retenção configurada em {{ inventory_hostname }}"
+          when: retention_result is succeeded
+
+      rescue:
+        - name: "Falha ao configurar retenção"
+          debug:
+            msg: "AVISO: Falha ao configurar retenção em {{ inventory_hostname }}"
+
+    - name: "Configurar HTTPS (SSL/TLS)"
+      block:
+        - name: "Habilitar HTTPS"
+          uri:
+            url: "http://{{ ansible_host }}/api/security/ssl"
+            method: POST
+            user: "{{ ansible_user }}"
+            password: "{{ ansible_password | default('admin') }}"
+            body_format: json
+            body:
+              enabled: "{{ camera_ssl_enabled }}"
+              port: "{{ camera_https_port }}"
+            status_code: [200, 201, 204]
+          register: ssl_result
+          when: camera_online
+          ignore_errors: yes
+
+        - name: "HTTPS habilitado com sucesso"
+          debug:
+            msg: "HTTPS habilitado em {{ inventory_hostname }}"
+          when: ssl_result is succeeded
+
+      rescue:
+        - name: "Falha ao habilitar HTTPS"
+          debug:
+            msg: "AVISO: Falha ao habilitar HTTPS em {{ inventory_hostname }}"
+
+  post_tasks:
+    - name: "Validar configuração finalizada"
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ camera_https_port if camera_ssl_enabled else camera_http_port }}"
+        timeout: 10
+      register: validation
+      when: camera_online
+      ignore_errors: yes
+
+    - name: "Registrar resultado"
+      copy:
+        content: |
+          Câmera: {{ inventory_hostname }}
+          IP: {{ ansible_host }}
+          Localização: {{ location }}
+          Status: {% if validation is succeeded %}✓ Configurado com sucesso{% else %}⚠ Com avisos{% endif %}
+          Data: {{ ansible_now() }}
+        dest: "/tmp/camera_deploy_{{ inventory_hostname }}.log"
+
+    - name: "Sumário final"
+      debug:
+        msg: "Deploy completado para {{ inventory_hostname }} ({{ location }})"
+
+  handlers:
+    - name: "Restart Camera Service"
+      uri:
+        url: "http://{{ ansible_host }}/api/system/reboot"
+        method: POST
+        user: "{{ ansible_user }}"
+        password: "{{ ansible_password | default('admin') }}"
+        status_code: [200, 201, 204]

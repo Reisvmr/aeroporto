@@ -1,0 +1,90 @@
+---
+# Template Zabbix - Monitoramento de Infraestrutura
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Versão: 1.0
+# Aplicável a: Servidores de Monitoramento
+
+zabbix_export:
+  version: '5.4'
+  groups:
+    - name: "Infrastructure"
+      uuid: "h3fd556gl2ke937j5i49if5f4el2l2l2"
+  
+  templates:
+    - name: "Infraestrutura - Monitoramento Completo"
+      description: "Template para monitorar servidores de infraestrutura"
+      uuid: "i4ge667hm3lf048k6j50jg6g5fm3m3m3"
+      group: "Infrastructure"
+      
+      items:
+        # PostgreSQL
+        - name: "PostgreSQL - Status"
+          type: "HTTP_AGENT"
+          key: "postgresql.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "PostgreSQL - Conexões Ativas"
+          type: "HTTP_AGENT"
+          key: "postgresql.connections"
+          delay: "300s"
+          history: "30d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Zabbix Server
+        - name: "Zabbix Server - Status"
+          type: "HTTP_AGENT"
+          key: "zabbix.server.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # AWX
+        - name: "AWX - Status"
+          type: "HTTP_AGENT"
+          key: "awx.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        - name: "AWX - Containers Docker"
+          type: "HTTP_AGENT"
+          key: "awx.docker.containers"
+          delay: "120s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+        # Grafana
+        - name: "Grafana - Status"
+          type: "HTTP_AGENT"
+          key: "grafana.status"
+          delay: "60s"
+          history: "7d"
+          status: "ACTIVE"
+          value_type: "UNSIGNED"
+          
+      triggers:
+        - name: "PostgreSQL {HOST.NAME} está DOWN"
+          expression: |
+            {Infraestrutura - Monitoramento Completo:postgresql.status.eq(DOWN)}=1
+          severity: "CRITICAL"
+          enabled: "YES"
+          
+        - name: "Zabbix Server {HOST.NAME} está DOWN"
+          expression: |
+            {Infraestrutura - Monitoramento Completo:zabbix.server.status.eq(DOWN)}=1
+          severity: "HIGH"
+          enabled: "YES"
+          
+        - name: "AWX {HOST.NAME} está DOWN"
+          expression: |
+            {Infraestrutura - Monitoramento Completo:awx.status.eq(DOWN)}=1
+          severity: "HIGH"
+          enabled: "YES"
