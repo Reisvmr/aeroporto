@@ -1,0 +1,225 @@
+# ============================================================================
+# CONFIGURAÇÃO DE AMBIENTE - INSTALAÇÃO ZABBIX FASE 1
+# ============================================================================
+#
+# Este arquivo contém todas as variáveis configuráveis para a instalação
+# Copie para environment.local e customize conforme necessário
+#
+# USO: source environment.local (ou environment.example)
+#
+
+# ============================================================================
+# CONFIGURAÇÕES GERAIS
+# ============================================================================
+
+# Ativar modo debug (true/false)
+DEBUG="false"
+
+# Ativar modo seco (não executa nada, apenas mostra) (true/false)
+DRY_RUN="false"
+
+# Modo interativo - solicita confirmações (true/false)
+INTERACTIVE="true"
+
+# Diretório de logs
+LOG_DIR="/var/log"
+
+# ============================================================================
+# CONFIGURAÇÕES POSTGRESQL
+# ============================================================================
+
+# Versão PostgreSQL
+PG_VERSION="16"
+
+# IP e Porta PostgreSQL
+PG_HOST="10.31.38.64"
+PG_PORT="5432"
+
+# Database Zabbix
+PG_DB="zabbix"
+
+# Usuário PostgreSQL para Zabbix
+PG_USER="zabbix"
+
+# Senha PostgreSQL - DEFINA ANTES DE EXECUTAR
+# Deixe vazio para ser solicitado interativamente
+PG_PASSWORD=""
+
+# Caminho de dados PostgreSQL
+PG_DATA_PATH="/var/lib/postgresql"
+
+# Caminho de backups
+PG_BACKUP_PATH="/backups/postgresql"
+
+# Timezone
+TIMEZONE="America/Sao_Paulo"
+
+# ============================================================================
+# CONFIGURAÇÕES ZABBIX SERVER
+# ============================================================================
+
+# Versão Zabbix
+ZABBIX_VERSION="7.0"
+ZABBIX_RELEASE="7.0.0"
+
+# Hostname do servidor Zabbix
+ZABBIX_HOST="zbx-server-01"
+
+# IP do servidor Zabbix
+ZABBIX_IP="10.31.38.60"
+
+# Porta do servidor Zabbix
+ZABBIX_PORT="10051"
+
+# Usuário do sistema para Zabbix
+ZABBIX_USER="zabbix"
+
+# Grupo do sistema para Zabbix
+ZABBIX_GROUP="zabbix"
+
+# ============================================================================
+# CONFIGURAÇÕES ZABBIX FRONTEND
+# ============================================================================
+
+# Hostname do servidor Frontend
+FRONTEND_HOST="zbx-fe-01"
+
+# IP do servidor Frontend
+FRONTEND_IP="10.31.38.62"
+
+# IP/Hostname do servidor Zabbix (visto do Frontend)
+ZABBIX_SERVER="10.31.38.60"
+ZABBIX_SERVER_PORT="10051"
+
+# Usuário do sistema web (www-data em Debian/Ubuntu, apache em CentOS)
+WEB_USER="www-data"
+WEB_GROUP="www-data"
+
+# FQDN do Frontend (para certificado HTTPS)
+FRONTEND_FQDN="zbx.example.com"
+
+# ============================================================================
+# CONFIGURAÇÕES DE HARDWARE
+# ============================================================================
+
+# CPU mínima para Frontend (em vCPU)
+MIN_CPU="4"
+
+# RAM mínima (em GB)
+MIN_RAM="8"
+
+# Disco mínimo (em GB)
+MIN_DISK="50"
+
+# ============================================================================
+# CONFIGURAÇÕES DE CONECTIVIDADE
+# ============================================================================
+
+# Teste de porta TCP para validação
+TEST_TCP_TIMEOUT="5"
+
+# Domínios críticos para validação
+CRITICAL_DOMAINS=(
+    "repo.zabbix.com"
+    "www.zabbix.com"
+    "grafana.com"
+    "download.postgresql.org"
+    "github.com"
+    "api.github.com"
+)
+
+# ============================================================================
+# CONFIGURAÇÕES DE PERFORMANCE
+# ============================================================================
+
+# PostgreSQL: Shared Buffers (em MB)
+PG_SHARED_BUFFERS="24576"
+
+# PostgreSQL: Effective Cache Size (em MB)
+PG_EFFECTIVE_CACHE="73728"
+
+# PostgreSQL: Work Memory (em MB)
+PG_WORK_MEM="122"
+
+# Zabbix Server: Número de pollers
+ZBX_POLLERS="4"
+
+# Zabbix Server: Cache Size (em MB)
+ZBX_CACHE_SIZE="32"
+
+# ============================================================================
+# CONFIGURAÇÕES DE SEGURANÇA
+# ============================================================================
+
+# Habilitar SSL/TLS para PostgreSQL (true/false)
+PG_SSL="false"
+
+# Habilitar SSL/TLS para Frontend (true/false)
+FRONTEND_SSL="false"
+
+# Caminho do certificado SSL (se habilitado)
+SSL_CERT_PATH="/etc/ssl/certs/zabbix.crt"
+
+# Caminho da chave privada SSL (se habilitado)
+SSL_KEY_PATH="/etc/ssl/private/zabbix.key"
+
+# ============================================================================
+# CONFIGURAÇÕES DE NOTIFICAÇÃO
+# ============================================================================
+
+# Servidor SMTP (desabilitar deixando em branco)
+SMTP_SERVER=""
+
+# Porta SMTP
+SMTP_PORT="587"
+
+# Email do remetente
+SMTP_FROM="zabbix@example.com"
+
+# ============================================================================
+# CONFIGURAÇÕES DE RETENÇÃO DE DADOS
+# ============================================================================
+
+# Dias para manter histórico de valores
+HISTORY_DAYS="30"
+
+# Dias para manter histórico de eventos
+EVENT_DAYS="30"
+
+# ============================================================================
+# VALIDAÇÃO
+# ============================================================================
+
+# Pular validação de pré-requisitos (true/false) - NÃO RECOMENDADO
+SKIP_VALIDATION="false"
+
+# ============================================================================
+# NOTAS IMPORTANTES
+# ============================================================================
+
+# 1. NUNCA comita este arquivo com senhas reais
+# 2. Use environment.local para customizações locais
+# 3. Variáveis não definidas usam defaults do script
+# 4. Em produção, use um gerenciador de segredos (1Password, Vault, etc)
+# 5. Revise todos os IPs e hostnames para seu ambiente
+
+# ============================================================================
+# VALORES PADRÃO FASE 1 (sem HA)
+# ============================================================================
+
+# Estes valores já estão corretos para a Fase 1 (sem redundância):
+# - PostgreSQL em um servidor único (pg-01)
+# - Zabbix Server em um servidor único (zbx-server-01)
+# - Zabbix Frontend em um servidor único (zbx-fe-01)
+# - Sem replicação PostgreSQL
+# - Sem clustering Zabbix
+# - Sem balanceador de carga
+
+# Para Fase 2 (com HA):
+# - Duplicar hosts PostgreSQL
+# - Configurar replicação streaming
+# - Usar pgPool-II para HA PostgreSQL
+# - Clonar Zabbix Server para standby
+# - Usar keepalived para VIP Zabbix Server
+# - Adicionar segundo Frontend
+# - Usar nginx upstream para balanceamento
