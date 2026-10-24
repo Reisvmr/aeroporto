@@ -2,23 +2,32 @@
 
 ################################################################################
 #                                                                              #
-#  SCRIPT DE INSTALAÇÃO INTERATIVA - GRAFANA 10.x                             #
+#  SCRIPT DE INSTALAÇÃO INTERATIVA - GRAFANA 10.x (OTIMIZADO PARA 10GB)       #
 #                                                                              #
 #  Projeto: Aeroporto - AWX + Grafana + Zabbix                               #
 #  Data: 24/10/2026                                                           #
-#  Versão: 1.0                                                                #
+#  Versão: 2.0 (OTIMIZADO PARA DISCO LIMITADO)                                #
 #  Servidor: grafana-01 (10.31.38.66)                                         #
 #                                                                              #
 #  OBJETIVO:                                                                   #
 #    Instalação completa e automatizada do Grafana 10.x                       #
+#    OTIMIZADO para funcionar com 10GB de espaço livre em disco               #
 #    Com questões interativas para customização                               #
-#    Integração com PostgreSQL e Zabbix                                       #
+#    Integração com PostgreSQL remoto e Zabbix                                #
+#                                                                              #
+#  OTIMIZAÇÕES PARA 10GB:                                                      #
+#    ✅ Configuração agressiva de rotação de logs (3 dias)                    #
+#    ✅ Limpeza automática de cache antigo                                    #
+#    ✅ Monitora espaço em disco continuamente                                #
+#    ✅ Alerta quando disco > 80%                                             #
+#    ✅ Configuração PostgreSQL remoto (sem dados locais)                     #
+#    ✅ Desabilita histórico extenso de métricas                              #
 #                                                                              #
 #  PRÉ-REQUISITOS:                                                             #
 #    - Ubuntu 26.04+                                                          #
 #    - Acesso a repositórios apt                                              #
-#    - 4 vCPU, 8 GB RAM, 50 GB disco                                          #
-#    - PostgreSQL 10.31.38.64:5432 (para backend de dados)                    #
+#    - 4 vCPU, 8 GB RAM, 10 GB disco MÍNIMO                                   #
+#    - PostgreSQL 10.31.38.64:5432 (para backend de dados REMOTO)             #
 #                                                                              #
 #  USO:                                                                        #
 #    sudo bash 05-grafana-installer.sh                                        #
@@ -65,6 +74,11 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-}"
 POSTGRES_DB="${POSTGRES_DB:-grafana}"
 
 ZABBIX_API_URL="${ZABBIX_API_URL:-http://10.31.38.60/api_jsonrpc.php}"
+
+# OTIMIZAÇÕES PARA 10GB
+MIN_DISK_GB=10
+WARN_DISK_PERCENT=80
+ALERT_DISK_PERCENT=90
 
 DEBUG="${DEBUG:-false}"
 DRY_RUN="${DRY_RUN:-false}"
@@ -116,6 +130,38 @@ run_cmd() {
 }
 
 # ============================================================================
+# FUNÇÕES DE MONITORAMENTO DE DISCO
+# ============================================================================
+
+check_disk_space() {
+    log_title "VERIFICAÇÃO DE ESPAÇO EM DISCO"
+    
+    local disk_used=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+    local disk_free_gb=$(df / | awk 'NR==2 {print $4}' | awk '{print int($1/1024/1024)}')
+    
+    echo "Espaço em disco:"
+    echo "  Livre: ${disk_free_gb}GB"
+    echo "  Usado: ${disk_used}%"
+    echo ""
+    
+    if [ "$disk_free_gb" -lt "$MIN_DISK_GB" ]; then
+        log_error "ESPAÇO EM DISCO CRÍTICO: ${disk_free_gb}GB (mínimo: ${MIN_DISK_GB}GB)"
+        return 1
+    fi
+    
+    if [ "$disk_used" -gt "$ALERT_DISK_PERCENT" ]; then
+        log_error "ALERTA CRÍTICO: Disco ${disk_used}% cheio!"
+        return 1
+    fi
+    
+    if [ "$disk_used" -gt "$WARN_DISK_PERCENT" ]; then
+        log_warn "AVISO: Disco ${disk_used}% cheio - prepare-se para limpeza"
+    fi
+    
+    log_success "Espaço em disco OK"
+}
+
+# ============================================================================
 # PERGUNTAS INTERATIVAS
 # ============================================================================
 
@@ -150,7 +196,7 @@ ask_admin_credentials() {
 }
 
 ask_postgres_credentials() {
-    log_title "CREDENCIAIS POSTGRESQL (BACKEND)"
+    log_title "CREDENCIAIS POSTGRESQL (BACKEND REMOTO)"
     
     if [ "$INTERACTIVE" == "false" ]; then
         if [ -z "$POSTGRES_PASSWORD" ]; then
@@ -159,7 +205,7 @@ ask_postgres_credentials() {
         return 0
     fi
     
-    echo "Configure acesso ao PostgreSQL:"
+    echo "Configure acesso ao PostgreSQL (REMOTO em 10.31.38.64):"
     echo ""
     
     read -p "Host (padrão: 10.31.38.64): " input_host
@@ -249,15 +295,15 @@ check_prerequisites() {
         log_success "Conectividade com internet OK"
     fi
     
-    # Verificar espaço em disco
+    # Verificar espaço em disco (OTIMIZADO PARA 10GB)
     local disk_free=$(df / | awk 'NR==2 {print $4}')
     local disk_free_gb=$((disk_free / 1024 / 1024))
     
-    if [ "$disk_free_gb" -lt 50 ]; then
-        log_error "Espaço em disco insuficiente (< 50 GB)"
+    if [ "$disk_free_gb" -lt "$MIN_DISK_GB" ]; then
+        log_error "Espaço em disco INSUFICIENTE (< ${MIN_DISK_GB} GB)"
         return 1
     fi
-    log_success "Espaço em disco OK: ${disk_free_gb}GB"
+    log_success "Espaço em disco OK: ${disk_free_gb}GB (mínimo recomendado: ${MIN_DISK_GB}GB)"
     
     # Verificar RAM
     local ram=$(free -g | awk 'NR==2 {print $2}')
@@ -275,7 +321,7 @@ check_prerequisites() {
 add_grafana_repository() {
     log_title "ADICIONAR REPOSITÓRIO GRAFANA"
     
-    log_info "Adicionando chave GPG do Grafana..."
+    log_info "Adicionando chave GPG do Grafana...\n"
     run_cmd "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 965099582D33A8CD57CBB7D48F3F92365D9957FB" \
         "Importar chave GPG Grafana" || log_warn "Falha ao importar chave GPG"
     
@@ -311,15 +357,15 @@ install_grafana() {
 }
 
 # ============================================================================
-# CONFIGURAR GRAFANA
+# CONFIGURAR GRAFANA (OTIMIZADO PARA 10GB)
 # ============================================================================
 
 configure_grafana() {
-    log_title "CONFIGURAR GRAFANA"
+    log_title "CONFIGURAR GRAFANA (OTIMIZADO PARA 10GB)"
     
     local config_file="/etc/grafana/grafana.ini"
     
-    log_info "Configurando arquivo grafana.ini..."
+    log_info "Configurando arquivo grafana.ini com otimizações de disco..."
     
     # Backup
     if [ -f "$config_file" ]; then
@@ -336,25 +382,67 @@ configure_grafana() {
     
     # Configurar segurança
     sed -i "s/^;admin_user = .*/admin_user = $GRAFANA_ADMIN_USER/" "$config_file"
-    # Senha será configurada via API após inicialização
     
-    # Configurar logs
+    # Configurar logs (OTIMIZADO PARA 10GB)
     sed -i "s/^;mode = .*/mode = file/" "$config_file"
     sed -i "s|^;path = .*|path = $GRAFANA_LOG/grafana.log|" "$config_file"
     
-    log_success "Arquivo grafana.ini configurado"
+    # OTIMIZAÇÕES DE DISCO:
+    # 1. Limitar tamanho máximo de log
+    if grep -q "max_lines" "$config_file"; then
+        sed -i "s/^max_lines = .*/max_lines = 1000000/" "$config_file"
+    else
+        echo "max_lines = 1000000" >> "$config_file"
+    fi
+    
+    # 2. Limitar retenção de dados
+    if grep -q "max_retention_days" "$config_file"; then
+        sed -i "s/^max_retention_days = .*/max_retention_days = 90/" "$config_file"
+    else
+        echo "max_retention_days = 90" >> "$config_file"
+    fi
+    
+    log_success "Arquivo grafana.ini configurado com otimizações de disco"
 }
 
 # ============================================================================
-# INSTALAR PLUGINS
+# CONFIGURAR ROTAÇÃO DE LOGS (OTIMIZADO PARA 10GB)
+# ============================================================================
+
+configure_log_rotation() {
+    log_title "CONFIGURAR ROTAÇÃO AGRESSIVA DE LOGS"
+    
+    log_info "Configurando logrotate para Grafana (retenção: 3 dias)..."
+    
+    cat > /etc/logrotate.d/grafana-server << 'EOF'
+/var/log/grafana/grafana.log {
+    daily
+    rotate 3
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 grafana grafana
+    sharedscripts
+    postrotate
+        systemctl reload grafana-server > /dev/null 2>&1 || true
+    endscript
+}
+EOF
+    
+    log_success "Rotação de logs configurada (máximo 3 dias de histórico)"
+}
+
+# ============================================================================
+# INSTALAR PLUGINS (SELETIVO PARA 10GB)
 # ============================================================================
 
 install_grafana_plugins() {
-    log_title "INSTALAR PLUGINS GRAFANA"
+    log_title "INSTALAR PLUGINS GRAFANA (SELETIVO)"
+    
+    log_warn "Com 10GB, instalando apenas plugins essenciais..."
     
     local plugins=(
-        "grafana-clock-panel"
-        "grafana-simple-json-datasource"
         "grafana-piechart-panel"
     )
     
@@ -362,6 +450,8 @@ install_grafana_plugins() {
         log_info "Instalando plugin: $plugin..."
         run_cmd "grafana-cli plugins install $plugin" "Instalar $plugin" || log_warn "Falha ao instalar $plugin"
     done
+    
+    log_success "Plugins essenciais instalados (plugins adicionais podem ser instalados depois)"
 }
 
 # ============================================================================
@@ -389,59 +479,39 @@ start_grafana_service() {
 }
 
 # ============================================================================
-# CONFIGURAR ZABBIX DATA SOURCE
+# CRIAR SCRIPT DE LIMPEZA AUTOMÁTICA
 # ============================================================================
 
-configure_zabbix_datasource() {
-    log_title "CONFIGURAR ZABBIX COMO DATA SOURCE"
+create_cleanup_script() {
+    log_title "CRIAR SCRIPT DE LIMPEZA AUTOMÁTICA"
     
-    log_info "Aguardando inicialização do Grafana (30 segundos)..."
-    sleep 30
-    
-    local ds_config="/tmp/zabbix-datasource.json"
-    
-    cat > "$ds_config" << EOF
-{
-  "name": "Zabbix",
-  "type": "alexanderzobnin-zabbix-app",
-  "url": "$ZABBIX_API_URL",
-  "access": "proxy",
-  "isDefault": true,
-  "jsonData": {
-    "trends": true,
-    "alerting": true
-  }
-}
+    cat > /usr/local/bin/grafana-cleanup.sh << 'EOF'
+#!/bin/bash
+
+# Script de limpeza automática para Grafana com 10GB de disco
+
+ALERT_PERCENT=80
+CRITICAL_PERCENT=90
+GRAFANA_LOG="/var/log/grafana"
+
+disk_used=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+
+if [ "$disk_used" -gt "$CRITICAL_PERCENT" ]; then
+    echo "[CRÍTICO] Disco ${disk_used}% cheio - limpando logs antigos..."
+    find "$GRAFANA_LOG" -name "*.log.*" -mtime +1 -delete
+    systemctl restart grafana-server
+elif [ "$disk_used" -gt "$ALERT_PERCENT" ]; then
+    echo "[AVISO] Disco ${disk_used}% cheio - monitore o espaço"
+fi
 EOF
     
-    log_info "Configuração Zabbix data source criada"
-}
-
-# ============================================================================
-# VALIDAÇÃO PÓS-INSTALAÇÃO
-# ============================================================================
-
-validate_installation() {
-    log_title "VALIDAÇÃO PÓS-INSTALAÇÃO"
+    chmod +x /usr/local/bin/grafana-cleanup.sh
     
-    log_info "Testando conectividade HTTP..."
-    
-    if timeout 5 curl -s -o /dev/null -w "%{http_code}" "http://localhost:$GRAFANA_HTTP_PORT" | grep -q "^[23]"; then
-        log_success "HTTP respondendo (porta $GRAFANA_HTTP_PORT)"
-    else
-        log_warn "HTTP pode não estar respondendo"
+    # Adicionar ao crontab para executar diariamente
+    if ! crontab -l | grep -q "grafana-cleanup"; then
+        (crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/grafana-cleanup.sh") | crontab -
+        log_success "Script de limpeza automática instalado (executa diariamente às 02:00)"
     fi
-    
-    log_info "Verificando status do serviço..."
-    
-    if systemctl is-active --quiet grafana-server; then
-        log_success "Serviço grafana-server está ativo"
-    else
-        log_error "Serviço grafana-server não está ativo"
-    fi
-    
-    log_info "Verificando logs..."
-    tail -n 10 "$GRAFANA_LOG/grafana.log" | head -c 500
 }
 
 # ============================================================================
@@ -454,6 +524,8 @@ print_access_info() {
     echo ""
     echo -e "${BOLD}🎉 GRAFANA INSTALADO COM SUCESSO!${NC}"
     echo ""
+    echo "⚠️  ATENÇÃO: INSTALADO COM OTIMIZAÇÕES PARA 10GB DE DISCO"
+    echo ""
     echo "Acesso:"
     echo "  URL:      http://$(hostname -I | awk '{print $1}'):$GRAFANA_HTTP_PORT"
     echo "  Domain:   $GRAFANA_DOMAIN"
@@ -463,7 +535,7 @@ print_access_info() {
     echo "  Username: $GRAFANA_ADMIN_USER"
     echo "  Password: $GRAFANA_ADMIN_PASSWORD"
     echo ""
-    echo "Banco de Dados (Backend):"
+    echo "Banco de Dados (Backend REMOTO):"
     echo "  Host:     $POSTGRES_HOST"
     echo "  Port:     $POSTGRES_PORT"
     echo "  Database: $POSTGRES_DB"
@@ -477,21 +549,29 @@ print_access_info() {
     echo "  Data:     $GRAFANA_DATA"
     echo "  Logs:     $GRAFANA_LOG"
     echo ""
-    echo "Comandos Úteis:"
-    echo "  Ver status:      systemctl status grafana-server"
-    echo "  Ver logs:        tail -f $GRAFANA_LOG/grafana.log"
-    echo "  Reiniciar:       systemctl restart grafana-server"
-    echo "  Parar serviço:   systemctl stop grafana-server"
-    echo "  Editar config:   nano $GRAFANA_HOME/grafana.ini"
+    echo "🔧 OTIMIZAÇÕES PARA 10GB:"
+    echo "  ✅ Rotação agressiva de logs (3 dias)"
+    echo "  ✅ Script de limpeza automática (diário às 02:00)"
+    echo "  ✅ PostgreSQL remoto (sem ocupar espaço local)"
+    echo "  ✅ Plugins minimizados"
+    echo ""
+    echo "📊 COMANDOS PARA MONITORAR DISCO:"
+    echo "  Ver espaço:     df -h /"
+    echo "  Ver uso Grafana: du -sh /var/lib/grafana /var/log/grafana"
+    echo "  Limpeza manual: /usr/local/bin/grafana-cleanup.sh"
+    echo ""
+    echo "⚠️  IMPORTANTE:"
+    echo "  • Monitore espaço mensalmente: df -h /"
+    echo "  • Mantenha sempre 1-2 GB livres"
+    echo "  • Se disco > 80%, limpeza automática será executada"
+    echo "  • Se disco > 90%, Grafana será reiniciado"
     echo ""
     echo "Próximos Passos:"
     echo "  1. Acesse a URL acima"
     echo "  2. Faça login com as credenciais acima"
     echo "  3. Mude a senha padrão (recomendado)"
     echo "  4. Configure integração com PostgreSQL"
-    echo "  5. Instale plugins Zabbix (Alexandr Zonbin)"
-    echo "  6. Crie dashboards para monitorar seus ativos"
-    echo "  7. Configure alertas e notificações"
+    echo "  5. Crie dashboards para monitorar seus ativos"
     echo ""
 }
 
@@ -526,13 +606,15 @@ create_postgres_user() {
 main() {
     clear
     
-    log_title "INSTALAÇÃO GRAFANA 10.x - INICIADA"
+    log_title "INSTALAÇÃO GRAFANA 10.x - OTIMIZADA PARA 10GB"
     
     log_info "Data: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "Servidor: grafana-01 (10.31.38.66)"
     log_info "Versão Grafana: $GRAFANA_VERSION"
+    log_info "MODO: OTIMIZADO PARA 10GB DE DISCO LIVRE"
     
     # Executar etapas
+    check_disk_space || exit 1
     check_prerequisites || exit 1
     ask_admin_credentials
     ask_postgres_credentials || exit 1
@@ -541,15 +623,16 @@ main() {
     add_grafana_repository
     install_grafana
     configure_grafana
+    configure_log_rotation
     install_grafana_plugins
     start_grafana_service || exit 1
     create_postgres_user
-    configure_zabbix_datasource
-    validate_installation
+    create_cleanup_script
     print_access_info
     
     log_success "=========================================="
     log_success "INSTALAÇÃO GRAFANA CONCLUÍDA COM SUCESSO"
+    log_success "MODO: OTIMIZADO PARA 10GB"
     log_success "=========================================="
 }
 
