@@ -37,6 +37,9 @@ IP_ATUAL=$(hostname -I | awk '{print $1}')
 DISTRIBUICAO=$(lsb_release -d | awk -F: '{print $2}' | xargs)
 VERSAO_KERNEL=$(uname -r)
 
+# Log
+LOG_FILE="/tmp/00-prerequisitos-validacao-$(date +%s).log"
+
 # Contadores
 REQUISITOS_OK=0
 REQUISITOS_FALHADOS=0
@@ -57,21 +60,26 @@ print_header() {
 }
 
 print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_FILE"
 }
 
 print_ok() {
-    echo -e "${GREEN}[✓]${NC} $1"
+    echo -e "${GREEN}[✓]${NC} $1" | tee -a "$LOG_FILE"
     ((REQUISITOS_OK++))
 }
 
+print_error() {
+    echo -e "${RED}[✗]${NC} $1" | tee -a "$LOG_FILE"
+    ((REQUISITOS_FALHADOS++))
+}
+
 print_falha() {
-    echo -e "${RED}[✗]${NC} $1"
+    echo -e "${RED}[✗]${NC} $1" | tee -a "$LOG_FILE"
     ((REQUISITOS_FALHADOS++))
 }
 
 print_aviso() {
-    echo -e "${YELLOW}[⚠]${NC} $1"
+    echo -e "${YELLOW}[⚠]${NC} $1" | tee -a "$LOG_FILE"
     ((AVISOS++))
 }
 
@@ -449,6 +457,10 @@ main() {
     
     # Resumo final
     imprimir_resumo
+    
+    echo ""
+    echo "Log completo: $LOG_FILE"
+    echo ""
     
     # Retornar status
     if [[ $REQUISITOS_FALHADOS -eq 0 ]]; then
