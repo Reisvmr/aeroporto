@@ -1,0 +1,76 @@
+# Inventário Ansible - VIP/Load Balancer HA (Fase 2)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Configuração: HAProxy + Keepalived
+
+all:
+  children:
+    vip_lb_cluster:
+      hosts:
+        vip_lb_primary:
+          ansible_host: 10.31.38.70
+          ansible_user: root
+          vip_name: "VIP Primary"
+          vip_role: "master"
+          vip_priority: 100
+          vip_ip: "10.31.38.70"
+          virtual_ipaddress: "10.31.38.70"
+          haproxy_enabled: true
+          keepalived_enabled: true
+          
+        vip_lb_backup:
+          ansible_host: 10.31.38.71
+          ansible_user: root
+          vip_name: "VIP Backup"
+          vip_role: "backup"
+          vip_priority: 99
+          vip_ip: "10.31.38.71"
+          virtual_ipaddress: "10.31.38.70"
+          haproxy_enabled: true
+          keepalived_enabled: true
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        
+        # Keepalived VRRP
+        vrrp_virtual_router_id: 50
+        vrrp_interface: "eth0"
+        vrrp_auth_type: "PASS"
+        vrrp_auth_pass: "aeroporto-ha"
+        vrrp_advert_int: 1
+        
+        # HAProxy
+        haproxy_version: "2.x"
+        haproxy_maxconn: 2048
+        haproxy_timeout_connect: 5000
+        haproxy_timeout_client: 50000
+        haproxy_timeout_server: 50000
+        
+        # Backends
+        backends:
+          - name: "zabbix_backend"
+            port: 80
+            servers:
+              - "10.31.38.60:80"
+              - "10.31.38.61:80"
+          - name: "grafana_backend"
+            port: 3000
+            servers:
+              - "10.31.38.66:3000"
+              - "10.31.38.67:3000"
+          - name: "awx_backend"
+            port: 8080
+            servers:
+              - "10.31.38.68:8080"
+              - "10.31.38.69:8080"
+        
+        # Health checks
+        health_check_enabled: true
+        health_check_interval: 5
+        health_check_timeout: 3
+        health_check_rise: 2
+        health_check_fall: 3

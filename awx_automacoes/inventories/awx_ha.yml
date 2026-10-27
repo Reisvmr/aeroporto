@@ -1,0 +1,65 @@
+# Inventário Ansible - AWX HA (Fase 2)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Configuração: Cluster com Shared Database + Docker Compose
+
+all:
+  children:
+    awx_cluster:
+      hosts:
+        awx_node1:
+          ansible_host: 10.31.38.68
+          ansible_user: root
+          awx_version: "22.x"
+          awx_instance_name: "AWX HA Node 1"
+          awx_admin_user: "admin"
+          awx_http_port: 8080
+          awx_db_host: "10.31.38.64"
+          awx_db_port: 5432
+          awx_db_name: "awx"
+          awx_db_user: "awx"
+          awx_node_id: 1
+          docker_compose_dir: "/opt/awx"
+          
+        awx_node2:
+          ansible_host: 10.31.38.69
+          ansible_user: root
+          awx_version: "22.x"
+          awx_instance_name: "AWX HA Node 2"
+          awx_admin_user: "admin"
+          awx_http_port: 8080
+          awx_db_host: "10.31.38.64"
+          awx_db_port: 5432
+          awx_db_name: "awx"
+          awx_db_user: "awx"
+          awx_node_id: 2
+          docker_compose_dir: "/opt/awx"
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        
+        # Cluster settings
+        awx_ha_enabled: true
+        awx_node_type: "execution"
+        awx_execution_environment: "latest"
+        
+        # Database
+        awx_db_type: "postgresql"
+        awx_db_ssl: true
+        
+        # Redis (cluster mode)
+        awx_redis_host: "localhost"
+        awx_redis_port: 6379
+        awx_redis_mode: "standalone"  # Pode ser cluster
+        
+        # Container settings
+        docker_registry: "quay.io"
+        docker_username: "awx"
+        
+        # Executors
+        awx_max_jobs_per_executor: 100
+        awx_container_registry: "quay.io"

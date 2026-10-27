@@ -1,0 +1,65 @@
+# Inventário Ansible - Zabbix Server HA (Fase 2)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Configuração: Cluster com Shared Database
+
+all:
+  children:
+    zabbix_cluster:
+      children:
+        zabbix_server_nodes:
+          hosts:
+            zbx_server_node1:
+              ansible_host: 10.31.38.60
+              ansible_user: root
+              zabbix_version: "7.0-lts"
+              zabbix_server_name: "Zabbix Server HA Node 1"
+              zabbix_server_port: 10051
+              zabbix_db_host: "10.31.38.64"
+              zabbix_db_port: 5432
+              zabbix_db_name: "zabbix"
+              zabbix_db_user: "zabbix"
+              node_id: 1
+              
+            zbx_server_node2:
+              ansible_host: 10.31.38.61
+              ansible_user: root
+              zabbix_version: "7.0-lts"
+              zabbix_server_name: "Zabbix Server HA Node 2"
+              zabbix_server_port: 10051
+              zabbix_db_host: "10.31.38.64"
+              zabbix_db_port: 5432
+              zabbix_db_name: "zabbix"
+              zabbix_db_user: "zabbix"
+              node_id: 2
+        
+        zabbix_frontend:
+          hosts:
+            zbx_frontend_vip:
+              ansible_host: 10.31.38.70
+              ansible_user: root
+              zabbix_frontend_name: "Zabbix Frontend HA"
+              zabbix_frontend_port: 80
+              zabbix_server_backend: "10.31.38.60,10.31.38.61"
+              zabbix_db_host: "10.31.38.64"
+              frontend_vip: true
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        
+        # Cluster settings
+        zabbix_ha_enabled: true
+        zabbix_node_timeout: 30
+        zabbix_sync_interval: 60
+        
+        # Database
+        zabbix_db_type: "postgresql"
+        zabbix_db_tlsconnect: "require"
+        
+        # Monitoring
+        zabbix_monitored_hosts: 676
+        zabbix_data_retention: 30

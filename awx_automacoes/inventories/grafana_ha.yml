@@ -1,0 +1,58 @@
+# Inventário Ansible - Grafana HA (Fase 2)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Configuração: Cluster com Shared Database
+
+all:
+  children:
+    grafana_cluster:
+      hosts:
+        grafana_node1:
+          ansible_host: 10.31.38.66
+          ansible_user: root
+          grafana_version: "10.x"
+          grafana_instance_name: "Grafana HA Node 1"
+          grafana_http_port: 3000
+          grafana_db_type: "postgres"
+          grafana_db_host: "10.31.38.64"
+          grafana_db_port: 5432
+          grafana_db_name: "grafana"
+          grafana_db_user: "grafana"
+          node_id: 1
+          
+        grafana_node2:
+          ansible_host: 10.31.38.67
+          ansible_user: root
+          grafana_version: "10.x"
+          grafana_instance_name: "Grafana HA Node 2"
+          grafana_http_port: 3000
+          grafana_db_type: "postgres"
+          grafana_db_host: "10.31.38.64"
+          grafana_db_port: 5432
+          grafana_db_name: "grafana"
+          grafana_db_user: "grafana"
+          node_id: 2
+
+      vars:
+        # Variáveis comuns
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        
+        # Cluster settings
+        grafana_ha_enabled: true
+        grafana_session_provider: "db"
+        grafana_session_cookie_secure: true
+        
+        # Data source: Zabbix
+        grafana_zabbix_url: "http://10.31.38.70"  # VIP Zabbix
+        grafana_zabbix_api_url: "http://10.31.38.70/api_jsonrpc.php"
+        
+        # Alerting
+        grafana_alerting_enabled: true
+        grafana_alert_frequency: "1m"
+        
+        # Storage
+        grafana_log_mode: "file"
+        grafana_log_max_days: 7

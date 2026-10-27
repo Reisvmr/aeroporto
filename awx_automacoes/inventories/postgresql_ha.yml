@@ -1,0 +1,88 @@
+# Inventário Ansible - PostgreSQL HA (Fase 2)
+# Projeto: Aeroporto
+# Data: 24/10/2026
+# Configuração: Primary-Standby Replication
+
+all:
+  children:
+    postgresql_cluster:
+      children:
+        postgresql_primary:
+          hosts:
+            pg_primary_01:
+              ansible_host: 10.31.38.64
+              ansible_user: root
+              postgres_version: "16"
+              postgres_role: "primary"
+              postgres_port: 5432
+              replication_user: "replication"
+              wal_level: "replica"
+              max_wal_senders: 10
+              wal_keep_size: "1GB"
+              # Databases
+              databases:
+                - name: "zabbix"
+                  owner: "zabbix"
+                - name: "grafana"
+                  owner: "grafana"
+                - name: "awx"
+                  owner: "awx"
+              # Users
+              postgres_users:
+                - name: "zabbix"
+                  password: "{{ zabbix_db_password }}"
+                  role_attr_flags: "CREATEDB,CREATEROLE"
+                - name: "grafana"
+                  password: "{{ grafana_db_password }}"
+                - name: "awx"
+                  password: "{{ awx_db_password }}"
+                - name: "replication"
+                  password: "{{ replication_user_password }}"
+                  role_attr_flags: "REPLICATION"
+        
+        postgresql_standby:
+          hosts:
+            pg_standby_01:
+              ansible_host: 10.31.38.65
+              ansible_user: root
+              postgres_version: "16"
+              postgres_role: "standby"
+              postgres_port: 5432
+              primary_host: "10.31.38.64"
+              primary_port: 5432
+              replication_user: "replication"
+              # Recovery settings
+              recovery_target_timeline: "latest"
+              wal_receiver_status_interval: "10s"
+              hot_standby: "on"
+              hot_standby_feedback: "on"
+
+      vars:
+        # Variáveis comuns PostgreSQL
+        ansible_port: 22
+        ansible_connection: ssh
+        ansible_become: yes
+        ansible_become_method: sudo
+        
+        # Replication settings
+        postgres_replication_slot: "standby_slot"
+        synchronous_commit: "remote_apply"  # CRITICAL - sincronização
+        
+        # Network/SSL
+        postgres_listen_addresses: "0.0.0.0"
+        postgres_ssl: true
+        postgres_ssl_cert_file: "/etc/postgresql/server.crt"
+        postgres_ssl_key_file: "/etc/postgresql/server.key"
+        
+        # Backup
+        postgres_backup_path: "/var/backups/postgresql"
+        postgres_backup_retention: 7
+        
+        # Monitoring
+        postgres_health_check: true
+        postgres_health_check_interval: 30
+        postgres_monitoring_user: "monitoring"
+        
+        # Failover
+        failover_enabled: true
+        failover_script: "/usr/local/bin/promote-postgres-replica.sh"
