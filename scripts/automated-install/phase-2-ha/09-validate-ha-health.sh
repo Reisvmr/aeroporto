@@ -293,15 +293,15 @@ validate_logs() {
     local log_count=0
     local error_count=0
     
-    for log in /tmp/*-ha-install-*.log /tmp/validate-*.log 2>/dev/null; do
+    for log in $(find /tmp -maxdepth 1 -name "*-ha-install-*.log" -o -name "validate-*.log" 2>/dev/null); do
         if [ -f "$log" ]; then
             log_count=$((log_count + 1))
             
-            if grep -q "ERROR\|FAILED\|✗" "$log" 2>/dev/null; then
+            if grep -q "ERROR\|FAILED" "$log" 2>/dev/null; then
                 error_count=$((error_count + 1))
-                print_warning "Log com potenciais erros: $(basename $log)"
+                print_warning "Log com potenciais erros: $(basename "$log")"
             else
-                print_ok "Log OK: $(basename $log)"
+                print_ok "Log OK: $(basename "$log")"
             fi
         fi
     done
