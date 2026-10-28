@@ -171,9 +171,9 @@ verificar_prerequisitos() {
     if [[ $DISCO_LIVRE -ge 20 ]]; then
         print_ok "Espaço em /var: ${DISCO_LIVRE}GB"
     else
-        print_warning "⚠️ Espaço em /var: ${DISCO_LIVRE}GB (20GB recomendado)"
-        print_warning "   Continuando instalação com monitoramento obrigatório"
-        print_warning "   Zabbix pode funcionar com menos espaço"
+        print_info "⚠️ Espaço em /var: ${DISCO_LIVRE}GB (20GB recomendado)"
+        print_info "   Continuando instalação com monitoramento obrigatório"
+        print_info "   Zabbix pode funcionar com menos espaço"
         # Não fazer exit - continuar com aviso registrado
     fi
 }
