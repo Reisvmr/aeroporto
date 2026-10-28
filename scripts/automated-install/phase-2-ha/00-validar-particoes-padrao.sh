@@ -19,7 +19,7 @@
 #   ./00-validar-particoes-padrao.sh vip
 ################################################################################
 
-set -e
+set +e  # Não parar na primeira falha - vamos tratar erros manualmente
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURAÇÕES
@@ -192,7 +192,7 @@ check_lvm() {
 check_gpt() {
     print_section "VALIDAÇÃO: Tabela de Partições GPT"
     
-    local discos=$(lsblk -d -n -o NAME,TYPE | grep disk | awk '{print $1}')
+    local discos=$(lsblk -d -n -o NAME,TYPE 2>/dev/null | grep disk | awk '{print $1}')
     
     if [ -z "$discos" ]; then
         print_error "Nenhum disco encontrado"
@@ -200,7 +200,22 @@ check_gpt() {
     fi
     
     for disco in $discos; do
-        local tipo=$(parted -s /dev/$disco print 2>/dev/null | grep "Partition Table:" | awk '{print $NF}')
+        # Tentar parted primeiro, se falhar usa fdisk
+        local tipo=""
+        if command -v parted &> /dev/null; then
+            tipo=$(parted -s /dev/$disco print 2>/dev/null | grep -i "Partition Table:" | awk '{print $NF}' || echo "")
+        fi
+        
+        # Se parted não funcionou, tentar fdisk
+        if [ -z "$tipo" ] && command -v fdisk &> /dev/null; then
+            tipo=$(fdisk -l /dev/$disco 2>/dev/null | grep -i "Disklabel type:" | awk '{print $NF}' || echo "")
+        fi
+        
+        # Se tipo ainda está vazio, assumir que é GPT (mais moderno)
+        if [ -z "$tipo" ]; then
+            print_warning "/dev/$disco: tipo não detectado (assumindo GPT moderno)"
+            continue
+        fi
         
         if [ "$tipo" = "gpt" ]; then
             print_ok "/dev/$disco: GPT ✓"
