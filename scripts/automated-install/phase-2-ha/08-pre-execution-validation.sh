@@ -24,7 +24,24 @@
 #
 ################################################################################
 
-set -e
+set +e  # Não parar em erros - vamos tratar com exit codes
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TRATAMENTO DE ERROS - Função auxiliar
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Função para capturar erros sem parar (com set +e)
+handle_error() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        return $exit_code
+    fi
+    return 0
+}
+
+# Função para garantir que script não fica em estado inválido
+trap 'handle_error' ERR
 
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURAÇÕES
