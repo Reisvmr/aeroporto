@@ -34,11 +34,43 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Variáveis
-TIPO_SERVIDOR="${1:-}"
-DATA=$(date '+%Y-%m-%d %H:%M:%S')
 HOSTNAME_ATUAL=$(hostname)
 IP_ATUAL=$(hostname -I | awk '{print $1}')
+DATA=$(date '+%Y-%m-%d %H:%M:%S')
 LOG_FILE="/tmp/validacao-particoes-$(date +%s).log"
+
+# Detectar tipo de servidor automaticamente do hostname se não foi passado argumento
+TIPO_SERVIDOR="${1:-}"
+
+if [ -z "$TIPO_SERVIDOR" ]; then
+    # Detectar automaticamente pelo hostname
+    case "$HOSTNAME_ATUAL" in
+        pg-01)
+            TIPO_SERVIDOR="postgresql-primary"
+            ;;
+        pg-02)
+            TIPO_SERVIDOR="postgresql-standby"
+            ;;
+        zbx-server-01|zbx-server-02)
+            TIPO_SERVIDOR="zabbix-server"
+            ;;
+        zbx-fe-01|zbx-fe-02)
+            TIPO_SERVIDOR="zabbix-frontend"
+            ;;
+        grafana-01|grafana-02)
+            TIPO_SERVIDOR="grafana"
+            ;;
+        awx-01|awx-02)
+            TIPO_SERVIDOR="awx"
+            ;;
+        vip-01|vip-02)
+            TIPO_SERVIDOR="vip"
+            ;;
+        *)
+            TIPO_SERVIDOR="desconhecido"
+            ;;
+    esac
+fi
 
 # Contadores
 CHECKS_OK=0
