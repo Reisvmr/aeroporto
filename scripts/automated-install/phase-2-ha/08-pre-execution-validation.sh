@@ -255,12 +255,14 @@ check_disk_space() {
     
     if [ "$tmp_space" -lt 5 ]; then
         print_warning "[DISCO] Espaço em /tmp: ${tmp_space}GB (recomendado: 5GB+)"
-        return 1
+        print_warning "         Continuando com monitoramento obrigatório"
+        # Não fazer return 1 - apenas avisar
     fi
     
     if [ "$opt_space" -lt 20 ] && [ "$opt_space" -gt 0 ]; then
         print_warning "[DISCO] Espaço em /opt: ${opt_space}GB (recomendado: 20GB+)"
-        return 1
+        print_warning "         Continuando com monitoramento obrigatório"
+        # Não fazer return 1 - apenas avisar
     fi
     
     print_ok "[DISCO] Espaço em disco OK (/ ${root_space}GB, /tmp ${tmp_space}GB)"

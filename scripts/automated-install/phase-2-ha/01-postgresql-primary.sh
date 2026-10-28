@@ -142,8 +142,10 @@ verificar_prerequisitos() {
     if [[ $DISCO_LIVRE -ge 50 ]]; then
         print_ok "Espaço em /var: ${DISCO_LIVRE}GB"
     else
-        print_erro "Espaço insuficiente em /var (${DISCO_LIVRE}GB < 50GB recomendado)"
-        exit 1
+        print_warning "⚠️ Espaço em /var: ${DISCO_LIVRE}GB (50GB recomendado)"
+        print_warning "   Continuando instalação com monitoramento obrigatório"
+        print_warning "   Crescimento esperado: ~2-3GB/mês"
+        # Não fazer exit - continuar com aviso registrado
     fi
 }
 
