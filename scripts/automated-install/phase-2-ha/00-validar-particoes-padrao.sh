@@ -132,8 +132,12 @@ check_mount_size() {
     fi
     
     local actual_size_gb=$(df -BG "$mount_point" | tail -1 | awk '{print $2}' | sed 's/G//')
-    local min_size=$((expected_size_gb * (100 - tolerance_percent) / 100))
-    local max_size=$((expected_size_gb * (100 + tolerance_percent) / 100))
+    
+    # Converter para inteiro (multiplicar por 10 se for decimal e dividir depois)
+    local expected_int=$(printf "%.0f" "$expected_size_gb")
+    
+    local min_size=$((expected_int * (100 - tolerance_percent) / 100))
+    local max_size=$((expected_int * (100 + tolerance_percent) / 100))
     
     if [ "$actual_size_gb" -ge "$min_size" ] && [ "$actual_size_gb" -le "$max_size" ]; then
         print_ok "$mount_point: ${actual_size_gb}GB (esperado: ~${expected_size_gb}GB)"
