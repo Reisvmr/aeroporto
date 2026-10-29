@@ -76,18 +76,20 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-contr
 
 ## ETAPA 4 — Configuração de replicação
 
-### 4.1 — Parar PostgreSQL
+### 4.1 — Criar usuário de replicação
 
-```bash
-systemctl stop postgresql
-```
-
-### 4.2 — Criar usuário de replicação
+> ⚠️ **O serviço deve estar RODANDO para executar este passo** — o psql precisa de conexão ativa.
 
 ```bash
 sudo -u postgres psql <<EOF
 CREATE USER replication WITH REPLICATION ENCRYPTED PASSWORD '${REPLICATION_PASS:-repl123}';
 EOF
+```
+
+### 4.2 — Parar PostgreSQL
+
+```bash
+systemctl stop postgresql
 ```
 
 ### 4.3 — Backup do postgresql.conf original
@@ -109,7 +111,7 @@ cat >> /etc/postgresql/16/main/postgresql.conf << 'EOF'
 wal_level = replica
 max_wal_senders = 10
 max_replication_slots = 10
-wal_keep_segments = 64
+wal_keep_size = 1024
 hot_standby = on
 hot_standby_feedback = on
 

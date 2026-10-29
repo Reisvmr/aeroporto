@@ -113,7 +113,21 @@ sed -i "s/^LogFile=.*/LogFile=\/var\/log\/zabbix\/zabbix_server.log/" /etc/zabbi
 
 ---
 
-## ETAPA 5 — Importar schema do banco (somente no NODE 1)
+## ETAPA 5 — Criar usuário no PostgreSQL para Zabbix
+
+> ⚠️ **Execute no pg-01 como postgres ANTES de importar o schema** — o schema precisa do usuário para conectar.
+
+```bash
+# Execute no pg-01 como postgres
+sudo -u postgres psql << EOF
+CREATE USER zabbix WITH ENCRYPTED PASSWORD '${DB_PASS:-zabbix123}';
+GRANT ALL PRIVILEGES ON DATABASE zabbix TO zabbix;
+EOF
+```
+
+---
+
+## ETAPA 6 — Importar schema do banco (somente no NODE 1)
 
 ```bash
 # Criar usuário e conceder permissões no PostgreSQL
@@ -131,18 +145,6 @@ zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz |     PGPASSWORD="${
 ✅ **Verificação:**
 ```bash
 PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix -c "\dt" | head -20
-```
-
----
-
-## ETAPA 6 — Criar usuário no PostgreSQL para Zabbix
-
-```bash
-# Execute no pg-01 como postgres
-sudo -u postgres psql << EOF
-CREATE USER zabbix WITH ENCRYPTED PASSWORD '${DB_PASS:-zabbix123}';
-GRANT ALL PRIVILEGES ON DATABASE zabbix TO zabbix;
-EOF
 ```
 
 ---

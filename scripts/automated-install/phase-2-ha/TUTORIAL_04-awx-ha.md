@@ -156,11 +156,12 @@ DOCKER_EOF
 
 ## ETAPA 6 — Criar usuário AWX no PostgreSQL
 
+> ℹ️ **O banco `awx` já foi criado** em `TUTORIAL_01` (step 5 — PostgreSQL Primary). Aqui apenas cria o usuário e concede permissões.
+
 ```bash
 # Execute no pg-01 como postgres
 sudo -u postgres psql << EOF
 CREATE USER awx WITH ENCRYPTED PASSWORD '${DB_PASS:-awx123}';
-CREATE DATABASE awx OWNER awx;
 GRANT ALL PRIVILEGES ON DATABASE awx TO awx;
 EOF
 ```

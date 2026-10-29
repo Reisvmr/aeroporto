@@ -189,13 +189,13 @@ instalar_postgresql() {
 configurar_replicacao() {
     print_section "CONFIGURAÇÃO DE REPLICAÇÃO"
     
-    print_info "Parando PostgreSQL..."
-    systemctl stop postgresql 2>&1 | tee -a "$LOG_FILE"
-    
-    print_info "Criando usuário de replicação..."
+    print_info "Criando usuário de replicação (serviço deve estar rodando)..."
     sudo -u postgres psql << EOF 2>&1 | tee -a "$LOG_FILE"
 CREATE USER $REPLICATION_USER WITH REPLICATION ENCRYPTED PASSWORD '$REPLICATION_PASS';
 EOF
+    
+    print_info "Parando PostgreSQL para configurar arquivos..."
+    systemctl stop postgresql 2>&1 | tee -a "$LOG_FILE"
     
     print_info "Configurando postgresql.conf..."
     
@@ -213,7 +213,7 @@ EOF
 wal_level = replica
 max_wal_senders = 10
 max_replication_slots = 10
-wal_keep_segments = 64
+wal_keep_size = 1024
 hot_standby = on
 hot_standby_feedback = on
 
