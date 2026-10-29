@@ -83,10 +83,11 @@ systemctl stop postgresql
 sudo -u postgres rm -rf /var/lib/pgsql/16/data/*
 ```
 
-### 4.3 — Executar pg_basebackup desde o Primary
+### 4.3 — Executar pg_basebackup no Standby (copia dados do Primary)
 
 ```bash
-# Isso copia toda a base do Primary para o Standby
+# Execute este comando NO pg-02 (Standby)
+# Ele conecta no pg-01 (Primary) e copia toda a base para o diretório local
 # -P = progresso, -v = verbose, -R = cria standby.signal + postgresql.auto.conf
 # --slot = cria replication slot no Primary
 sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/pgsql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
