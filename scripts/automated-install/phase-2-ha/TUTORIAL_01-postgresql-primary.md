@@ -108,6 +108,8 @@ cat >> /etc/postgresql/16/main/postgresql.conf << 'EOF'
 # CONFIGURAÇÕES DE REPLICAÇÃO (Phase 2 HA)
 # ═══════════════════════════════════════════════════════════════════════════
 
+listen_addresses = '*'
+
 wal_level = replica
 max_wal_senders = 10
 max_replication_slots = 10

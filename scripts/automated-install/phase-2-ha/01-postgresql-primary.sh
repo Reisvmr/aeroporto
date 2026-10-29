@@ -209,6 +209,9 @@ EOF
 # CONFIGURAÇÕES DE REPLICAÇÃO (Adicionadas pelo script 27/10/2026)
 # ═══════════════════════════════════════════════════════════════════════════
 
+# Aceitar conexões externas
+listen_addresses = '*'
+
 # Modo archive
 wal_level = replica
 max_wal_senders = 10
