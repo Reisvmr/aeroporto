@@ -109,6 +109,7 @@ cat >> /etc/postgresql/16/main/postgresql.conf << 'EOF'
 # ═══════════════════════════════════════════════════════════════════════════
 
 wal_level = replica
+listen_addresses = '*'
 hot_standby = on
 hot_standby_feedback = on
 max_standby_streaming_delay = 300s
