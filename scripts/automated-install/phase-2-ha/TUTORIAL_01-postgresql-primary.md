@@ -166,7 +166,29 @@ EOF
 # Iniciar PostgreSQL
 systemctl start postgresql
 sleep 3
+```
 
+✅ **Verificação — PostgreSQL escutando em todas as interfaces (não só localhost):**
+```bash
+ss -tlnp | grep 5432
+# Resultado esperado: 0.0.0.0:5432
+# Se aparecer 127.0.0.1:5432, o listen_addresses não foi aplicado — veja nota abaixo
+```
+
+> ⚠️ **Se aparecer `127.0.0.1:5432`:** o parâmetro pode ter sido sobrescrito por uma entrada anterior no arquivo.
+> Corrija com:
+> ```bash
+> # Verificar entradas duplicadas / conflitantes
+> grep listen_addresses /etc/postgresql/16/main/postgresql.conf
+>
+> # Forçar a configuração correta (sobrescreve tudo via ALTER SYSTEM)
+> sudo -u postgres psql -c "ALTER SYSTEM SET listen_addresses = '*';"
+> systemctl restart postgresql
+> sleep 3
+> ss -tlnp | grep 5432   # Deve mostrar 0.0.0.0:5432
+> ```
+
+```bash
 # Criar bancos
 sudo -u postgres psql -c "CREATE DATABASE zabbix OWNER postgres;"
 sudo -u postgres psql -c "CREATE DATABASE grafana OWNER postgres;"
@@ -214,6 +236,14 @@ sudo -u postgres psql -c "\l"
 
 # Verificar configuração wal_level
 sudo -u postgres psql -c "SHOW wal_level;"
+
+# Verificar listen_addresses
+sudo -u postgres psql -c "SHOW listen_addresses;"
+# Esperado: *
+
+# Confirmar porta escutando em todas as interfaces
+ss -tlnp | grep 5432
+# Esperado: 0.0.0.0:5432
 
 # Verificar replicação (após configurar pg-02)
 sudo -u postgres psql -c "SELECT * FROM pg_stat_replication;"
