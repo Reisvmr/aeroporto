@@ -123,10 +123,10 @@ validar_sistema_operacional() {
     fi
     
     # Verificar distribuição
-    if [[ "$DISTRIBUICAO" == *"Ubuntu"* ]] || [[ "$DISTRIBUICAO" == *"Debian"* ]]; then
+    if [[ "$DISTRIBUICAO" == *"Ubuntu"* ]]; then
         print_ok "Distribuição: $DISTRIBUICAO"
     else
-        print_aviso "Distribuição não é Ubuntu/Debian (encontrada: $DISTRIBUICAO)"
+        print_aviso "Distribuição não é Ubuntu 26.04 LTS (encontrada: $DISTRIBUICAO) — resolute-pgdg requer Ubuntu"
     fi
     
     # Verificar versão do kernel

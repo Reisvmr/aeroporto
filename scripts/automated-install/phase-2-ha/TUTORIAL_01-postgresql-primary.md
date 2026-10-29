@@ -8,7 +8,7 @@
 
 ## 📋 Pré-requisitos
 
-- Ubuntu/Debian atualizado  
+- Ubuntu **26.04 LTS (resolute)** atualizado
 - Mínimo 50 GB em `/var`  
 - IP estático configurado: `10.31.38.64`  
 - pg-02 (`10.31.38.65`) acessível na rede  
@@ -55,9 +55,13 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 ## ETAPA 3 — Instalação do PostgreSQL 16
 
 ```bash
-# Adicionar repositório oficial PostgreSQL
-sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget -q -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+# Adicionar repositório PGDG oficial — Ubuntu 26.04 LTS (resolute-pgdg)
+apt-get install -y curl ca-certificates
+install -d /usr/share/postgresql-common/pgdg
+curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail \
+    https://www.postgresql.org/media/keys/ACCC4CF8.asc
+sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+# lsb_release -cs retorna "resolute" → entry: resolute-pgdg
 
 # Atualizar cache
 apt-get update

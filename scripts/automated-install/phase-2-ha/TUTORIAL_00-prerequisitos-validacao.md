@@ -35,7 +35,7 @@ lsb_release -d
 uname -r
 ```
 
-✅ **Esperado:** Ubuntu 20.04/22.04 ou Debian 11/12
+✅ **Esperado:** Ubuntu **26.04 LTS (resolute)**
 
 ---
 

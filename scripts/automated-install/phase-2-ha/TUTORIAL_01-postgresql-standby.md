@@ -52,9 +52,13 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 ## ETAPA 3 — Instalação do PostgreSQL 16
 
 ```bash
-# Adicionar repositório oficial
-sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-wget -q -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+# Adicionar repositório PGDG oficial — Ubuntu 26.04 LTS (resolute-pgdg)
+apt-get install -y curl ca-certificates
+install -d /usr/share/postgresql-common/pgdg
+curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail \
+    https://www.postgresql.org/media/keys/ACCC4CF8.asc
+sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+# lsb_release -cs retorna "resolute" → entry: resolute-pgdg
 
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-contrib-16
