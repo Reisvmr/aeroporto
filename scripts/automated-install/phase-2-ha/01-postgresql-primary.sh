@@ -57,7 +57,7 @@ NC='\033[0m'
 # Variáveis
 PG_VERSION="16"
 PG_CLUSTER="main"
-PG_DATA="/var/lib/postgresql/${PG_VERSION}/${PG_CLUSTER}"
+PG_DATA="/var/lib/pgsql/${PG_VERSION}/data"
 PG_CONFIG="/etc/postgresql/${PG_VERSION}/${PG_CLUSTER}"
 PG_LOG="/var/log/postgresql"
 
@@ -138,11 +138,11 @@ verificar_prerequisitos() {
     fi
     
     # Verificar espaço em disco
-    DISCO_LIVRE=$(df -BG /var | awk 'NR==2{print $4}' | sed 's/G//')
+    DISCO_LIVRE=$(df -BG /var/lib/pgsql | awk 'NR==2{print $4}' | sed 's/G//')
     if [[ $DISCO_LIVRE -ge 50 ]]; then
-        print_ok "Espaço em /var: ${DISCO_LIVRE}GB"
+        print_ok "Espaço em /var/lib/pgsql: ${DISCO_LIVRE}GB"
     else
-        print_info "⚠️ Espaço em /var: ${DISCO_LIVRE}GB (50GB recomendado)"
+        print_info "⚠️ Espaço em /var/lib/pgsql: ${DISCO_LIVRE}GB (50GB recomendado)"
         print_info "   Continuando instalação com monitoramento obrigatório"
         print_info "   Crescimento esperado: ~2-3GB/mês"
         # Não fazer exit - continuar com aviso registrado

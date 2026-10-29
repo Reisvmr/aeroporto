@@ -36,7 +36,7 @@ id
 hostname -I | awk '{print $1}'   # Deve retornar: 10.31.38.64
 
 # Verificar espaço em /var
-df -BG /var | awk 'NR==2{print $4}'   # Deve ser >= 50G
+df -BG /var/lib/pgsql | awk 'NR==2{print $4}'   # Deve ser >= 50G
 ```
 
 ✅ **Verificação:** IP deve ser `10.31.38.64`, espaço >= 50GB

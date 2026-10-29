@@ -33,7 +33,7 @@ hostname -I | awk '{print $1}'   # Deve retornar: 10.31.38.65
 timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432 acessível" || echo "✗ pg-01:5432 INACESSÍVEL"
 
 # Verificar espaço em disco
-df -BG /var | awk 'NR==2{print $4}'   # Deve ser >= 50G
+df -BG /var/lib/pgsql | awk 'NR==2{print $4}'   # Deve ser >= 50G
 ```
 
 ✅ **Verificação:** IP = `10.31.38.65`, pg-01:5432 acessível, >= 50GB livres
@@ -80,7 +80,7 @@ systemctl stop postgresql
 
 ```bash
 # ⚠️ ATENÇÃO: isso apaga todos os dados locais — o Standby é recriado a partir do Primary
-sudo -u postgres rm -rf /var/lib/postgresql/16/main/*
+sudo -u postgres rm -rf /var/lib/pgsql/16/data/*
 ```
 
 ### 4.3 — Executar pg_basebackup desde o Primary
@@ -89,14 +89,14 @@ sudo -u postgres rm -rf /var/lib/postgresql/16/main/*
 # Isso copia toda a base do Primary para o Standby
 # -P = progresso, -v = verbose, -R = cria standby.signal + postgresql.auto.conf
 # --slot = cria replication slot no Primary
-sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/postgresql/16/main     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
+sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/pgsql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
 ```
 
 > 💬 Será solicitada a senha do usuário `replication` — insira `${REPLICATION_PASS:-repl123}`
 
 ✅ **Verificação após conclusão:**
 ```bash
-ls -la /var/lib/postgresql/16/main/standby.signal   # Deve existir
+ls -la /var/lib/pgsql/16/data/standby.signal   # Deve existir
 ```
 
 ### 4.4 — Adicionar configurações ao postgresql.conf
@@ -132,9 +132,9 @@ EOF
 
 ```bash
 # Se o -R do pg_basebackup não criou:
-if [[ ! -f /var/lib/postgresql/16/main/standby.signal ]]; then
-    touch /var/lib/postgresql/16/main/standby.signal
-    chown postgres:postgres /var/lib/postgresql/16/main/standby.signal
+if [[ ! -f /var/lib/pgsql/16/data/standby.signal ]]; then
+    touch /var/lib/pgsql/16/data/standby.signal
+    chown postgres:postgres /var/lib/pgsql/16/data/standby.signal
     echo "standby.signal criado manualmente"
 fi
 ```
