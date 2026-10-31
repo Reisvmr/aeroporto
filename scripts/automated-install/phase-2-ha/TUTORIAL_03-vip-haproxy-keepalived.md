@@ -8,10 +8,16 @@
 
 ## 📋 Pré-requisitos
 
-- PostgreSQL, Zabbix, Grafana e AWX já instalados nos seus respectivos nodes  
-- IPs estáticos: `10.31.38.70` (master) / `10.31.38.71` (backup)  
-- Ambos os servidores na mesma sub-rede (necessário para VRRP)  
-- Acesso root/sudo  
+> ⚠️ **Esta etapa é executada na Semana 2.**  
+> Neste ponto apenas o PostgreSQL (Semana 1) está instalado.  
+> Zabbix (Semana 3), Grafana (Semana 4) e AWX (Semana 5) serão configurados depois —  
+> os seus backends no HAProxy são criados já **desabilitados** (`disabled`) e  
+> ativados automaticamente pelos respectivos scripts de instalação.
+
+- ✅ PostgreSQL HA concluído (pg-01 `10.31.38.64` + pg-02 `10.31.38.65`)  
+- IPs estáticos configurados: vip-01 `10.31.38.70` · vip-02 `10.31.38.71` · VIP flutuante `10.31.38.72`  
+- Ambos os servidores na mesma sub-rede `/24` (necessário para VRRP unicast)  
+- Acesso root/sudo em vip-01 e vip-02  
 
 ---
 
@@ -30,25 +36,32 @@ hostname -I | awk '{print $1}'   # master: 10.31.38.70 | backup: 10.31.38.71
 # Verificar interface de rede padrão
 ip route | grep default | awk '{print $5}' | head -1
 
-# Testar conectividade com backends
-timeout 5 bash -c '</dev/tcp/10.31.38.60/80' && echo "✓ zabbix-01" || echo "✗ zabbix-01"
-timeout 5 bash -c '</dev/tcp/10.31.38.66/3000' && echo "✓ grafana-01" || echo "✗ grafana-01"
-timeout 5 bash -c '</dev/tcp/10.31.38.68/8080' && echo "✓ awx-01" || echo "✗ awx-01"
+# Confirmar conectividade entre vip-01 e vip-02 (VRRP unicast)
+ping -c 2 10.31.38.71   # executar no vip-01
+ping -c 2 10.31.38.70   # executar no vip-02
 
-# Verificar se protocolo VRRP (112) está permitido
-# (Ambos os servidores precisam se "ver" via multicast 224.0.0.18)
+# Confirmar que PostgreSQL está acessível via pg-01
+timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432" || echo "✗ pg-01:5432"
 ```
+
+> 📌 **Não testar Zabbix/Grafana/AWX aqui** — esses serviços ainda não foram instalados.  
+> Os backends são criados com `disabled` e habilitados nas semanas 3-5.
 
 ---
 
-## ETAPA 2 — Atualizar sistema e instalar HAProxy + Keepalived
+## ETAPA 2 — Instalar HAProxy + Keepalived (feito pelo script)
+
+O script `03-vip-haproxy-keepalived.sh` executa automaticamente:
 
 ```bash
+# O que o script faz (não precisa rodar manualmente):
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y haproxy keepalived
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+apt-get install -y haproxy
+apt-get install -y keepalived
 ```
 
-✅ **Verificação:** `haproxy -v && keepalived --version`
+✅ **Verificação pós-script:** `haproxy -v && keepalived --version`
 
 ---
 
@@ -89,8 +102,9 @@ frontend zabbix_front
 backend zabbix_back
     balance roundrobin
     option httpchk GET /zabbix/
-    server zbx-01 10.31.38.60:80 check
-    server zbx-02 10.31.38.61:80 check backup
+    # DISABLED — ativado pelo 04-zabbix-server-ha.sh (Semana 3)
+    server zbx-01 10.31.38.60:80 disabled
+    server zbx-02 10.31.38.61:80 disabled
 
 # ── Grafana ───────────────────────────────────────────────────────────────
 frontend grafana_front
@@ -100,8 +114,9 @@ frontend grafana_front
 backend grafana_back
     balance roundrobin
     option httpchk GET /api/health
-    server grafana-01 10.31.38.66:3000 check
-    server grafana-02 10.31.38.67:3000 check backup
+    # DISABLED — ativado pelo 05-grafana-ha.sh (Semana 4)
+    server grafana-01 10.31.38.66:3000 disabled
+    server grafana-02 10.31.38.67:3000 disabled
 
 # ── AWX ──────────────────────────────────────────────────────────────────
 frontend awx_front
@@ -111,8 +126,9 @@ frontend awx_front
 backend awx_back
     balance roundrobin
     option httpchk GET /api/v2/ping/
-    server awx-01 10.31.38.68:8080 check
-    server awx-02 10.31.38.69:8080 check backup
+    # DISABLED — ativado pelo 06-awx-ha.sh (Semana 5)
+    server awx-01 10.31.38.68:8080 disabled
+    server awx-02 10.31.38.69:8080 disabled
 
 # ── Stats ─────────────────────────────────────────────────────────────────
 listen stats

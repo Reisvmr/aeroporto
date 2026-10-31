@@ -18,7 +18,7 @@
 #   - HAProxy 2.x (Load Balancing)
 #   - Keepalived (VRRP Failover)
 #   - VIP flutuante: 10.31.38.72  (flutua entre vip-01=10.31.38.70 e vip-02=10.31.38.71)
-#   - 3 backends: Zabbix, Grafana, AWX
+#   - 3 backends pre-configurados: Zabbix, Grafana, AWX (disabled até semanas 3-5)
 #
 ################################################################################
 
@@ -257,28 +257,25 @@ backend backend_zabbix
     balance roundrobin
     option httpchk GET /zabbix/
     option http-keep-alive
-    
-    # Health checks
-    server zabbix_01 10.31.38.60:80 check inter 5s fall 3 rise 2
-    server zabbix_02 10.31.38.61:80 check inter 5s fall 3 rise 2
+    # DISABLED — habilitado na Semana 3 pelo script 04-zabbix-server-ha.sh
+    server zabbix_01 10.31.38.60:80 disabled
+    server zabbix_02 10.31.38.61:80 disabled
 
 backend backend_grafana
     mode http
     balance roundrobin
     option httpchk GET /api/health
-    
-    # Health checks
-    server grafana_01 10.31.38.66:3000 check inter 5s fall 3 rise 2
-    server grafana_02 10.31.38.67:3000 check inter 5s fall 3 rise 2
+    # DISABLED — habilitado na Semana 4 pelo script 05-grafana-ha.sh
+    server grafana_01 10.31.38.66:3000 disabled
+    server grafana_02 10.31.38.67:3000 disabled
 
 backend backend_awx
     mode http
     balance roundrobin
     option httpchk GET /api/v2/
-    
-    # Health checks
-    server awx_01 10.31.38.68:8080 check inter 5s fall 3 rise 2
-    server awx_02 10.31.38.69:8080 check inter 5s fall 3 rise 2
+    # DISABLED — habilitado na Semana 5 pelo script 06-awx-ha.sh
+    server awx_01 10.31.38.68:8080 disabled
+    server awx_02 10.31.38.69:8080 disabled
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Statistics
