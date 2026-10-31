@@ -6,6 +6,27 @@
 
 ---
 
+## 🖥️ Mapa de Servidores e IPs
+
+| Servidor       | IP             | Função                          | Semana |
+|----------------|----------------|---------------------------------|--------|
+| zbx-server-01  | 10.31.38.60    | Zabbix Server (Primary)         | 3      |
+| zbx-server-02  | 10.31.38.61    | Zabbix Server (Standby)         | 3      |
+| pg-01          | 10.31.38.64    | PostgreSQL Primary              | 1      |
+| pg-02          | 10.31.38.65    | PostgreSQL Standby              | 1      |
+| grafana-01     | 10.31.38.66    | Grafana (Primary)               | 4      |
+| grafana-02     | 10.31.38.67    | Grafana (Standby)               | 4      |
+| awx-01         | 10.31.38.68    | AWX (Primary)                   | 5      |
+| awx-02         | 10.31.38.69    | AWX (Standby)                   | 5      |
+| vip-01         | 10.31.38.70    | HAProxy + Keepalived (Master)   | 2      |
+| vip-02         | 10.31.38.71    | HAProxy + Keepalived (Backup)   | 2      |
+| **VIP**        | **10.31.38.72**| **VIP Flutuante (Keepalived)**  | 2      |
+
+> 📌 O IP `10.31.38.72` é o VIP flutuante — migra automaticamente entre vip-01 e vip-02 em caso de falha.  
+> Clientes e serviços acessam sempre via `10.31.38.72`, nunca diretamente pelos IPs estáticos das VIPs.
+
+---
+
 ## 📋 Índice de Scripts
 
 ### ✅ Scripts Criados (4 arquivos)
@@ -103,7 +124,7 @@
 - **Configura:**
   - HAProxy 2.x (Load Balancing)
   - Keepalived (VRRP Failover)
-  - VIP flutuante: 10.31.38.70
+  - VIP flutuante: 10.31.38.72 (flutua entre vip-01 e vip-02)
   - 3 backends: Zabbix, Grafana, AWX
   - Health checks (5s interval)
   - Firewall (portas 80, 443)
@@ -112,7 +133,7 @@
 - **Validação pós-instalação:**
   ```bash
   # Verificar VIP ativo:
-  ip addr | grep 10.31.38.70
+  ip addr | grep 10.31.38.72  # VIP flutuante
   
   # HAProxy stats:
   curl http://localhost:8081/stats
