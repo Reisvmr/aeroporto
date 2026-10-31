@@ -77,8 +77,8 @@ declare -A SERVERS=(
     [grafana_02]="10.31.38.67:3000"
     [awx_01]="10.31.38.68:8080"
     [awx_02]="10.31.38.69:8080"
-    [vip_master]="10.31.38.70:80"
-    [vip_backup]="10.31.38.71:80"
+    [vip_floating]="10.31.38.72:80"
+    [vip_master]="10.31.38.70:8081"
 )
 
 # Contadores
@@ -294,12 +294,12 @@ validate_vip() {
     print_section "VALIDAÇÃO VIP / LOAD BALANCER"
     
     # Master
-    print_info "Testando VIP Master (10.31.38.70)..."
-    validate_server "VIP Master" "10.31.38.70" "80"
+    print_info "Testando VIP Flutuante (10.31.38.72)..."
+    validate_server "VIP Flutuante" "10.31.38.72" "80"
     
     # Backup
-    print_info "Testando VIP Backup (10.31.38.71)..."
-    validate_server "VIP Backup" "10.31.38.71" "80"
+    print_info "Testando HAProxy vip-01 stats (10.31.38.70)..."
+    validate_server "HAProxy vip-01 stats" "10.31.38.70" "8081"
 }
 
 validate_logs() {

@@ -263,7 +263,7 @@ echo "Login: admin / ${AWX_ADMIN_PASS:-admin123}"
 
 ## 📝 Próximos passos
 
-1. Acesse: `http://10.31.38.70/awx` (via VIP)  
+1. Acesse: `http://10.31.38.72/awx` (via VIP)  
 2. Configure credenciais e inventários  
 3. Instale node2 (repita no awx-02 com `node2`)  
 

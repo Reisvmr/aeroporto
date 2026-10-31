@@ -149,7 +149,7 @@ sudo ./00-prerequisitos-validacao.sh vip
 sudo ./03-vip-haproxy-keepalived.sh backup
 
 # Validação:
-curl http://10.31.38.70/stats
+curl http://10.31.38.72/stats
 ```
 
 ### **SEMANA 3: Zabbix HA** (~4 horas)

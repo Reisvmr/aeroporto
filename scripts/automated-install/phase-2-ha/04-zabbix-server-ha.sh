@@ -79,7 +79,7 @@ DB_PASS="${DB_PASS:-zabbix123}"
 # IPs Zabbix
 ZABBIX_NODE1="10.31.38.60"
 ZABBIX_NODE2="10.31.38.61"
-ZABBIX_VIP="10.31.38.70"
+ZABBIX_VIP="10.31.38.72"
 
 # Sincronização
 RSYNC_USER="zabbix"

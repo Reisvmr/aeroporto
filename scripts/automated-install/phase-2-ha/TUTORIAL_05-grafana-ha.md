@@ -132,7 +132,7 @@ echo "SECRET_KEY=$SECRET_KEY"
 
 ```bash
 sed -i "s/^;http_port = 3000/http_port = 3000/" /etc/grafana/grafana.ini
-sed -i "s|^;root_url = .*|root_url = http://10.31.38.70|" /etc/grafana/grafana.ini
+sed -i "s|^;root_url = .*|root_url = http://10.31.38.72|" /etc/grafana/grafana.ini
 ```
 
 ### 5.7 — Configurar logging
@@ -185,7 +185,7 @@ sleep 10
 curl -s -X POST http://admin:admin@localhost:3000/api/datasources   -H "Content-Type: application/json"   -d '{
     "name": "Zabbix",
     "type": "alexanderzobnin-zabbix-datasource",
-    "url": "http://10.31.38.70/zabbix/api_jsonrpc.php",
+    "url": "http://10.31.38.72/zabbix/api_jsonrpc.php",
     "access": "proxy",
     "jsonData": {
       "username": "Admin",
@@ -226,14 +226,14 @@ tail -30 /var/log/grafana/grafana.log
 # Acesso web (local)
 echo "Grafana local: http://$(hostname -I | awk '{print $1}'):3000"
 echo "Login: admin / admin (troque na primeira entrada!)"
-echo "Grafana via VIP: http://10.31.38.70"
+echo "Grafana via VIP: http://10.31.38.72"
 ```
 
 ---
 
 ## 📝 Próximos passos
 
-1. Acesse: `http://10.31.38.70` e troque a senha do admin  
+1. Acesse: `http://10.31.38.72` e troque a senha do admin  
 2. Instale node2 (repita os passos no grafana-02 com `node2`)  
 3. **⚠️ Use a mesma `secret_key` em ambos os nodes!**  
 4. Importe dashboards da comunidade Grafana  

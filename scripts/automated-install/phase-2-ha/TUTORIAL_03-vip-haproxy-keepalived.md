@@ -277,7 +277,7 @@ systemctl start haproxy
 ## 📝 Próximos passos
 
 1. Execute em **vip-02** com argumento `backup`  
-2. Teste acesso via VIP: `http://10.31.38.70` (Zabbix), `http://10.31.38.70:3000` (Grafana)  
+2. Teste acesso via VIP: `http://10.31.38.70` (Zabbix), `http://10.31.38.72:3000` (Grafana)  
 3. Prossiga com `07-pre-execution-validation.sh` para validação final  
 
 ---

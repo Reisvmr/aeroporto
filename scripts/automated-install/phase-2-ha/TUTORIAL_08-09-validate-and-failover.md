@@ -299,11 +299,11 @@ ssh root@10.31.38.65 "sudo -u postgres psql -c 'SELECT pg_is_in_recovery();'"
 ssh root@10.31.38.66 "systemctl stop grafana-server"
 
 # Verificar que HAProxy redireciona para grafana-02
-curl -s -o /dev/null -w "%{http_code}" http://10.31.38.70:3000/api/health
+curl -s -o /dev/null -w "%{http_code}" http://10.31.38.72:3000/api/health
 # Esperado: 200
 
 # Verificar qual backend respondeu
-curl -s http://10.31.38.70:3000/api/health | python3 -m json.tool
+curl -s http://10.31.38.72:3000/api/health | python3 -m json.tool
 
 # Restaurar
 ssh root@10.31.38.66 "systemctl start grafana-server"

@@ -202,7 +202,7 @@ ss -tlnp | grep 10051
 
 ## 📝 Próximos passos
 
-1. Acesse o frontend via: `http://10.31.38.70/zabbix`  
+1. Acesse o frontend via: `http://10.31.38.72/zabbix`  
 2. Instale node2 (repita os passos no zbx-server-02)  
 3. Configure templates e hosts no Zabbix  
 

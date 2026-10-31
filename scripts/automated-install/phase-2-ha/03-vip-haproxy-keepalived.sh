@@ -17,7 +17,7 @@
 # Configura:
 #   - HAProxy 2.x (Load Balancing)
 #   - Keepalived (VRRP Failover)
-#   - VIP flutuante: 10.31.38.70
+#   - VIP flutuante: 10.31.38.72  (flutua entre vip-01=10.31.38.70 e vip-02=10.31.38.71)
 #   - 3 backends: Zabbix, Grafana, AWX
 #
 ################################################################################
@@ -57,9 +57,9 @@ ROLE="${1:-}"  # master ou backup
 INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
 
 # IPs VIP
-VIP_IP="10.31.38.70"
-VIP_MASTER="10.31.38.70"
-VIP_BACKUP="10.31.38.71"
+VIP_IP="10.31.38.72"       # VIP flutuante (Keepalived virtual_ipaddress)
+VIP_MASTER="10.31.38.70"   # vip-01 — IP estático (gerenciamento)
+VIP_BACKUP="10.31.38.71"   # vip-02 — IP estático (gerenciamento)
 
 # Backends
 ZABBIX_01="10.31.38.60:80"
@@ -89,7 +89,7 @@ print_header() {
     echo "║                                                                    ║"
     echo "║  ⚖️  INSTALAÇÃO VIP/HAPROXY/KEEPALIVED - PROJETO AEROPORTO (HA)     ║"
     echo "║                                                                    ║"
-    echo "║  VIP: 10.31.38.70 (Failover automático <5s)                       ║"
+    echo "║  VIP: 10.31.38.72 (Failover automático <5s)                       ║"
     echo "║  Role: $ROLE"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
@@ -358,6 +358,10 @@ vrrp_instance VI_1 {
     virtual_router_id $ROUTER_ID
     priority $PRIORITY
     advert_int $ADVERT_INT
+    unicast_src_ip $([ "$ROLE" = "master" ] && echo "$VIP_MASTER" || echo "$VIP_BACKUP")
+    unicast_peer {
+        $([ "$ROLE" = "master" ] && echo "$VIP_BACKUP" || echo "$VIP_MASTER")
+    }
     authentication {
         auth_type PASS
         auth_pass aeroporto_ha
