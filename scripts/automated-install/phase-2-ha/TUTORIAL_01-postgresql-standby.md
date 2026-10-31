@@ -118,7 +118,7 @@ sudo -u postgres pg_basebackup \
 
 ✅ **Verificação após conclusão:**
 ```bash
-ls -la /var/lib/pgsql/16/data/standby.signal   # Deve existir
+ls -la /var/lib/postgresql/16/data/standby.signal   # Deve existir
 ```
 
 ### 4.4 — Adicionar configurações ao postgresql.conf
@@ -155,9 +155,9 @@ EOF
 
 ```bash
 # Se o -R do pg_basebackup não criou:
-if [[ ! -f /var/lib/pgsql/16/data/standby.signal ]]; then
-    touch /var/lib/pgsql/16/data/standby.signal
-    chown postgres:postgres /var/lib/pgsql/16/data/standby.signal
+if [[ ! -f /var/lib/postgresql/16/data/standby.signal ]]; then
+    touch /var/lib/postgresql/16/data/standby.signal
+    chown postgres:postgres /var/lib/postgresql/16/data/standby.signal
     echo "standby.signal criado manualmente"
 fi
 ```
