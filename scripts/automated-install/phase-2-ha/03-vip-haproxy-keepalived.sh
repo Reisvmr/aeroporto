@@ -1,18 +1,18 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 06-vip-haproxy-keepalived.sh
+# Script: 03-vip-haproxy-keepalived.sh
 # Descrição: Instalação HAProxy + Keepalived para VIP HA Load Balancer
 # Data: 27/10/2026
 # Versão: 2.0 (HA)
 # Servidores: vip-01 (10.31.38.70 - Master) / vip-02 (10.31.38.71 - Backup)
 # Autor: Aeroporto - Infraestrutura HA
 #
-# Uso: sudo ./06-vip-haproxy-keepalived.sh <master|backup>
+# Uso: sudo ./03-vip-haproxy-keepalived.sh <master|backup>
 #
 # Exemplo:
-#   Em vip-01: sudo ./06-vip-haproxy-keepalived.sh master
-#   Em vip-02: sudo ./06-vip-haproxy-keepalived.sh backup
+#   Em vip-01: sudo ./03-vip-haproxy-keepalived.sh master
+#   Em vip-02: sudo ./03-vip-haproxy-keepalived.sh backup
 #
 # Configura:
 #   - HAProxy 2.x (Load Balancing)
@@ -129,7 +129,7 @@ verificar_prerequisitos() {
     if [[ "$ROLE" != "master" ]] && [[ "$ROLE" != "backup" ]]; then
         print_erro "Role deve ser 'master' ou 'backup'"
         echo ""
-        echo "Uso: sudo ./06-vip-haproxy-keepalived.sh <master|backup>"
+        echo "Uso: sudo ./03-vip-haproxy-keepalived.sh <master|backup>"
         exit 1
     fi
     print_ok "Role: $ROLE"

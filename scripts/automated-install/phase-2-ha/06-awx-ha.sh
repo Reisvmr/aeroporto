@@ -1,18 +1,18 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 04-awx-ha.sh
+# Script: 06-awx-ha.sh
 # Descrição: Instalação AWX 22.x em cluster HA com Docker Compose
 # Data: 27/10/2026
 # Versão: 2.0 (HA)
 # Servidores: awx-01 (10.31.38.68) / awx-02 (10.31.38.69)
 # Autor: Aeroporto - Infraestrutura HA
 #
-# Uso: sudo ./04-awx-ha.sh <node1|node2>
+# Uso: sudo ./06-awx-ha.sh <node1|node2>
 #
 # Exemplo:
-#   Em awx-01: sudo ./04-awx-ha.sh node1
-#   Em awx-02: sudo ./04-awx-ha.sh node2
+#   Em awx-01: sudo ./06-awx-ha.sh node1
+#   Em awx-02: sudo ./06-awx-ha.sh node2
 #
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
@@ -143,7 +143,7 @@ verificar_prerequisitos() {
     if [[ "$NODE_TYPE" != "node1" ]] && [[ "$NODE_TYPE" != "node2" ]]; then
         print_erro "Node Type deve ser 'node1' ou 'node2'"
         echo ""
-        echo "Uso: sudo ./04-awx-ha.sh <node1|node2>"
+        echo "Uso: sudo ./06-awx-ha.sh <node1|node2>"
         exit 1
     fi
     print_ok "Node Type: $NODE_TYPE"

@@ -1,7 +1,7 @@
 # 🔍 TUTORIAL — Validação Pré-Execução (Phase 2 HA)
-> **Script:** `08-pre-execution-validation.sh`  
+> **Script:** `07-pre-execution-validation.sh`  
 > **Objetivo:** Validar que todos os pré-requisitos estão OK antes de executar os scripts de instalação  
-> **Uso:** `sudo ./08-pre-execution-validation.sh [--auto-fix]`
+> **Uso:** `sudo ./07-pre-execution-validation.sh [--auto-fix]`
 
 ---
 
@@ -26,13 +26,13 @@
 
 ```bash
 # Sem parâmetros: apenas valida e exibe relatório
-sudo ./08-pre-execution-validation.sh
+sudo ./07-pre-execution-validation.sh
 
 # Com --auto-fix: tenta corrigir problemas simples automaticamente
-sudo ./08-pre-execution-validation.sh --auto-fix
+sudo ./07-pre-execution-validation.sh --auto-fix
 
 # Modo silencioso (só erros)
-sudo ./08-pre-execution-validation.sh --quiet
+sudo ./07-pre-execution-validation.sh --quiet
 ```
 
 ---
@@ -41,7 +41,7 @@ sudo ./08-pre-execution-validation.sh --quiet
 
 ```bash
 cd /home/reisvmr/Documentos/REPOS/aeroporto/scripts/automated-install/phase-2-ha
-sudo ./08-pre-execution-validation.sh
+sudo ./07-pre-execution-validation.sh
 ```
 
 ✅ **Resultado esperado:**
@@ -95,7 +95,7 @@ apt-get install -y shellcheck
 ### Falha de permissão
 
 ```
-[✗] Permissão: 02-zabbix-server-ha.sh não é executável
+[✗] Permissão: 04-zabbix-server-ha.sh não é executável
 ```
 
 **Ação:**
@@ -137,7 +137,7 @@ nmap -p 22 10.31.38.65
 ## ETAPA 3 — Modo auto-fix
 
 ```bash
-sudo ./08-pre-execution-validation.sh --auto-fix
+sudo ./07-pre-execution-validation.sh --auto-fix
 ```
 
 O `--auto-fix` corrige automaticamente:
@@ -174,13 +174,13 @@ Após **RESULTADO: PRONTO PARA INSTALAR**, siga a ordem de instalação:
 
 1. `00-prerequisitos-validacao.sh` — em todos os servidores  
 2. `01-postgresql-primary.sh` — em pg-01  
-3. `01-postgresql-standby.sh` — em pg-02  
-4. `06-vip-haproxy-keepalived.sh master` — em vip-01  
-5. `06-vip-haproxy-keepalived.sh backup` — em vip-02  
-6. `02-zabbix-server-ha.sh node1` — em zbx-server-01  
-7. `02-zabbix-server-ha.sh node2` — em zbx-server-02  
+3. `02-postgresql-standby.sh` — em pg-02  
+4. `03-vip-haproxy-keepalived.sh master` — em vip-01  
+5. `03-vip-haproxy-keepalived.sh backup` — em vip-02  
+6. `04-zabbix-server-ha.sh node1` — em zbx-server-01  
+7. `04-zabbix-server-ha.sh node2` — em zbx-server-02  
 8. `05-grafana-ha.sh node1` — em grafana-01  
 9. `05-grafana-ha.sh node2` — em grafana-02  
-10. `04-awx-ha.sh node1` — em awx-01  
-11. `04-awx-ha.sh node2` — em awx-02  
-12. `09-validate-ha-health.sh` — em qualquer servidor (validação final)  
+10. `06-awx-ha.sh node1` — em awx-01  
+11. `06-awx-ha.sh node2` — em awx-02  
+12. `08-validate-ha-health.sh` — em qualquer servidor (validação final)  

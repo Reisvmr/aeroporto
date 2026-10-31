@@ -1,8 +1,8 @@
 # 🐘 TUTORIAL — PostgreSQL 16 Standby
-> **Script:** `01-postgresql-standby.sh`  
+> **Script:** `02-postgresql-standby.sh`  
 > **Objetivo:** Instalar PostgreSQL 16 Standby com replicação streaming desde pg-01  
 > **Servidor:** pg-02 — IP: `10.31.38.65`  
-> **Uso:** `sudo ./01-postgresql-standby.sh`
+> **Uso:** `sudo ./02-postgresql-standby.sh`
 
 ---
 
@@ -213,7 +213,7 @@ sudo -u postgres psql -c "SELECT now() - pg_last_xact_replay_timestamp() AS repl
 
 1. Valide no **pg-01**: `SELECT * FROM pg_stat_replication;` → deve aparecer pg-02  
 2. Monitore o lag de replicação periodicamente  
-3. Prossiga com a instalação do VIP (`06-vip-haproxy-keepalived.sh`)  
+3. Prossiga com a instalação do VIP (`03-vip-haproxy-keepalived.sh`)  
 
 ---
 

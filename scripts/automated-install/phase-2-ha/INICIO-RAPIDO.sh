@@ -110,7 +110,7 @@ sleep 180
 
 # ETAPA 2: PostgreSQL Standby em pg-02 (demora ~15 minutos, inclui base backup)
 echo "Instalando PostgreSQL Standby em pg-02..."
-ssh -t usuario@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./01-postgresql-standby.sh'
+ssh -t usuario@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./02-postgresql-standby.sh'
 
 echo "✓ PostgreSQL Standby instalado em pg-02"
 echo ""
@@ -141,7 +141,7 @@ echo ""
 cat << 'EOF'
 # ETAPA 1: HAProxy+Keepalived Master em vip-01 (demora ~8 minutos)
 echo "Instalando HAProxy+Keepalived Master em vip-01..."
-ssh -t usuario@10.31.38.70 'cd /tmp/phase-2-ha && sudo ./06-vip-haproxy-keepalived.sh master'
+ssh -t usuario@10.31.38.70 'cd /tmp/phase-2-ha && sudo ./03-vip-haproxy-keepalived.sh master'
 
 echo "✓ HAProxy+Keepalived Master instalado em vip-01"
 echo ""
@@ -150,7 +150,7 @@ sleep 120
 
 # ETAPA 2: HAProxy+Keepalived Backup em vip-02 (demora ~8 minutos)
 echo "Instalando HAProxy+Keepalived Backup em vip-02..."
-ssh -t usuario@10.31.38.71 'cd /tmp/phase-2-ha && sudo ./06-vip-haproxy-keepalived.sh backup'
+ssh -t usuario@10.31.38.71 'cd /tmp/phase-2-ha && sudo ./03-vip-haproxy-keepalived.sh backup'
 
 echo "✓ HAProxy+Keepalived Backup instalado em vip-02"
 echo ""

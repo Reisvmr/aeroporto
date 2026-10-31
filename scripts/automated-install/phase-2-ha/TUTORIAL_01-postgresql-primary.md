@@ -277,7 +277,7 @@ sudo -u postgres psql -c "SELECT * FROM pg_stat_replication;"
 
 ## 📝 Próximos passos
 
-1. Execute o script `01-postgresql-standby.sh` em **pg-02**  
+1. Execute o script `02-postgresql-standby.sh` em **pg-02**  
 2. Valide a replicação: `SELECT * FROM pg_stat_replication;`  
 3. Monitore o lag: `SELECT now() - pg_last_xact_replay_timestamp();` (no standby)  
 

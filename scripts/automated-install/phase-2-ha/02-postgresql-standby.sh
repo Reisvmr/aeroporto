@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 01-postgresql-standby.sh
+# Script: 02-postgresql-standby.sh
 # Descrição: Instalação PostgreSQL 16 Standby com replicação streaming
 # Data: 27/10/2026
 # Versão: 2.0 (HA)
 # Servidor: pg-02 (10.31.38.65)
 # Autor: Aeroporto - Infraestrutura HA
 #
-# Uso: sudo ./01-postgresql-standby.sh
+# Uso: sudo ./02-postgresql-standby.sh
 #
 # Pré-requisitos:
 #   - pg-01 (Primary) já instalado e rodando

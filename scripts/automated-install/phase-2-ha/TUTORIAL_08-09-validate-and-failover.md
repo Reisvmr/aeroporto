@@ -1,7 +1,7 @@
 # 🏥 TUTORIAL — Validação de Saúde do Cluster HA
-> **Script:** `09-validate-ha-health.sh`  
+> **Script:** `08-validate-ha-health.sh`  
 > **Objetivo:** Verificar que todos os componentes do cluster HA estão saudáveis após instalação  
-> **Uso:** `sudo ./09-validate-ha-health.sh [--quiet] [--timeout=N]`
+> **Uso:** `sudo ./08-validate-ha-health.sh [--quiet] [--timeout=N]`
 
 ---
 
@@ -27,16 +27,16 @@
 
 ```bash
 # Execução completa (padrão)
-sudo ./09-validate-ha-health.sh
+sudo ./08-validate-ha-health.sh
 
 # Silencioso (só mostra falhas)
-sudo ./09-validate-ha-health.sh --quiet
+sudo ./08-validate-ha-health.sh --quiet
 
 # Timeout customizado em segundos (padrão: 10)
-sudo ./09-validate-ha-health.sh --timeout=30
+sudo ./08-validate-ha-health.sh --timeout=30
 
 # Saída em JSON (para integração com monitoramento)
-sudo ./09-validate-ha-health.sh --format=json
+sudo ./08-validate-ha-health.sh --format=json
 ```
 
 ---
@@ -45,7 +45,7 @@ sudo ./09-validate-ha-health.sh --format=json
 
 ```bash
 cd /home/reisvmr/Documentos/REPOS/aeroporto/scripts/automated-install/phase-2-ha
-sudo ./09-validate-ha-health.sh
+sudo ./08-validate-ha-health.sh
 ```
 
 ✅ **Resultado esperado (cluster saudável):**
@@ -174,7 +174,7 @@ ip addr show | grep 10.31.38.70
 Após validação bem-sucedida, execute o teste de failover:
 
 ```bash
-sudo ./10-failover-test.sh
+sudo ./09-failover-test.sh
 ```
 
 ---
@@ -183,16 +183,16 @@ sudo ./10-failover-test.sh
 
 ```bash
 # Adicionar verificação horária ao cron
-echo "0 * * * * root /opt/aeroporto/09-validate-ha-health.sh --quiet >> /var/log/ha-health.log 2>&1" \
+echo "0 * * * * root /opt/aeroporto/08-validate-ha-health.sh --quiet >> /var/log/ha-health.log 2>&1" \
     >> /etc/crontab
 ```
 
 ---
 
 # 🔄 TUTORIAL — Teste de Failover do Cluster HA
-> **Script:** `10-failover-test.sh`  
+> **Script:** `09-failover-test.sh`  
 > **Objetivo:** Validar que o failover automático funciona com RTO < 5 segundos  
-> **Uso:** `sudo ./10-failover-test.sh [--component=zabbix|grafana|awx|postgresql]`
+> **Uso:** `sudo ./09-failover-test.sh [--component=zabbix|grafana|awx|postgresql]`
 
 ---
 
@@ -221,7 +221,7 @@ echo "0 * * * * root /opt/aeroporto/09-validate-ha-health.sh --quiet >> /var/log
 
 ```bash
 cd /home/reisvmr/Documentos/REPOS/aeroporto/scripts/automated-install/phase-2-ha
-sudo ./10-failover-test.sh
+sudo ./09-failover-test.sh
 ```
 
 O DRY RUN **simula** os passos sem parar serviços:

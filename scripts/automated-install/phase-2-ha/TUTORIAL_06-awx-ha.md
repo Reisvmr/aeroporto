@@ -1,8 +1,8 @@
 # 🔄 TUTORIAL — AWX 22.x HA
-> **Script:** `04-awx-ha.sh`  
+> **Script:** `06-awx-ha.sh`  
 > **Objetivo:** Instalar AWX 22.x em cluster HA com Docker Compose  
 > **Servidores:** awx-01 (`10.31.38.68`) e awx-02 (`10.31.38.69`)  
-> **Uso:** `sudo ./04-awx-ha.sh <node1|node2>`
+> **Uso:** `sudo ./06-awx-ha.sh <node1|node2>`
 
 ---
 

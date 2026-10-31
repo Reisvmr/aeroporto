@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 10-failover-test.sh
+# Script: 09-failover-test.sh
 # Descrição: Teste de failover automático do cluster HA
 # Data: 27/10/2026
 # Versão: 1.0
 #
 # Objetivo: Validar que failover funciona corretamente (RTO < 5s)
 #
-# Uso: sudo ./10-failover-test.sh [--component=zabbix|grafana|awx|postgresql]
+# Uso: sudo ./09-failover-test.sh [--component=zabbix|grafana|awx|postgresql]
 #
 # Pré-requisitos:
 #   - Todos os scripts Phase 2 HA já executados
@@ -300,7 +300,7 @@ main() {
             ;;
         *)
             print_error "Componente inválido: $COMPONENT"
-            echo "Uso: sudo ./10-failover-test.sh [postgresql|zabbix|grafana|awx|vip|all]"
+            echo "Uso: sudo ./09-failover-test.sh [postgresql|zabbix|grafana|awx|vip|all]"
             exit 1
             ;;
     esac

@@ -1,18 +1,18 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 02-zabbix-server-ha.sh
+# Script: 04-zabbix-server-ha.sh
 # Descrição: Instalação Zabbix Server 7.0 LTS em cluster HA
 # Data: 27/10/2026
 # Versão: 2.0 (HA)
 # Servidores: zbx-server-01 (10.31.38.60) / zbx-server-02 (10.31.38.61)
 # Autor: Aeroporto - Infraestrutura HA
 #
-# Uso: sudo ./02-zabbix-server-ha.sh <node1|node2>
+# Uso: sudo ./04-zabbix-server-ha.sh <node1|node2>
 #
 # Exemplo:
-#   Em zbx-server-01: sudo ./02-zabbix-server-ha.sh node1
-#   Em zbx-server-02: sudo ./02-zabbix-server-ha.sh node2
+#   Em zbx-server-01: sudo ./04-zabbix-server-ha.sh node1
+#   Em zbx-server-02: sudo ./04-zabbix-server-ha.sh node2
 #
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
@@ -141,7 +141,7 @@ verificar_prerequisitos() {
     if [[ "$NODE_TYPE" != "node1" ]] && [[ "$NODE_TYPE" != "node2" ]]; then
         print_erro "Node Type deve ser 'node1' ou 'node2'"
         echo ""
-        echo "Uso: sudo ./02-zabbix-server-ha.sh <node1|node2>"
+        echo "Uso: sudo ./04-zabbix-server-ha.sh <node1|node2>"
         exit 1
     fi
     print_ok "Node Type: $NODE_TYPE"

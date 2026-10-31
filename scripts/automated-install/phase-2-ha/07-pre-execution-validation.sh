@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 08-pre-execution-validation.sh
+# Script: 07-pre-execution-validation.sh
 # Descrição: Validação PRÉ-EXECUÇÃO de todos os scripts Phase 2 HA
 # Data: 27/10/2026
 # Versão: 1.0
 #
 # Objetivo: GARANTIR que cada script rodará até o fim sem problemas
 #
-# Usa: sudo ./08-pre-execution-validation.sh [--auto-fix]
+# Usa: sudo ./07-pre-execution-validation.sh [--auto-fix]
 #
 # Validações:
 #   1. Sintaxe bash (shellcheck)
@@ -363,13 +363,13 @@ main() {
     local scripts=(
         "00-prerequisitos-validacao.sh"
         "01-postgresql-primary.sh"
-        "01-postgresql-standby.sh"
-        "02-zabbix-server-ha.sh"
-        "04-awx-ha.sh"
+        "02-postgresql-standby.sh"
+        "04-zabbix-server-ha.sh"
+        "06-awx-ha.sh"
         "05-grafana-ha.sh"
-        "06-vip-haproxy-keepalived.sh"
-        "09-validate-ha-health.sh"
-        "10-failover-test.sh"
+        "03-vip-haproxy-keepalived.sh"
+        "08-validate-ha-health.sh"
+        "09-failover-test.sh"
     )
     
     # Validações de Sistema
@@ -425,7 +425,7 @@ main() {
         echo "  Ações recomendadas:"
         echo "    1. Revisar erros acima"
         if [ "$AUTO_FIX" = false ]; then
-            echo "    2. Executar com --auto-fix: sudo ./08-pre-execution-validation.sh --auto-fix"
+            echo "    2. Executar com --auto-fix: sudo ./07-pre-execution-validation.sh --auto-fix"
         fi
         echo "    3. Executar novamente para validar correções"
         echo ""

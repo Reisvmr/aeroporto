@@ -1,8 +1,8 @@
 # ⚖️ TUTORIAL — VIP HAProxy + Keepalived
-> **Script:** `06-vip-haproxy-keepalived.sh`  
+> **Script:** `03-vip-haproxy-keepalived.sh`  
 > **Objetivo:** Instalar HAProxy + Keepalived com VIP flutuante para load balancing HA  
 > **Servidores:** vip-01 (`10.31.38.70` - Master) e vip-02 (`10.31.38.71` - Backup)  
-> **Uso:** `sudo ./06-vip-haproxy-keepalived.sh <master|backup>`
+> **Uso:** `sudo ./03-vip-haproxy-keepalived.sh <master|backup>`
 
 ---
 
@@ -278,7 +278,7 @@ systemctl start haproxy
 
 1. Execute em **vip-02** com argumento `backup`  
 2. Teste acesso via VIP: `http://10.31.38.70` (Zabbix), `http://10.31.38.70:3000` (Grafana)  
-3. Prossiga com `08-pre-execution-validation.sh` para validação final  
+3. Prossiga com `07-pre-execution-validation.sh` para validação final  
 
 ---
 

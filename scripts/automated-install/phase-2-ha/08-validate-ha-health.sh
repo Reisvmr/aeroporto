@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# Script: 09-validate-ha-health.sh
+# Script: 08-validate-ha-health.sh
 # Descrição: Validação de saúde do cluster HA após instalação
 # Data: 27/10/2026
 # Versão: 1.0
 #
 # Objetivo: Verificar que todos os scripts rodaram até o fim com sucesso
 #
-# Uso: sudo ./09-validate-ha-health.sh [--quiet] [--timeout=N]
+# Uso: sudo ./08-validate-ha-health.sh [--quiet] [--timeout=N]
 #
 # Pré-requisitos:
 #   - Todos os scripts Phase 2 HA já executados (Semanas 0-5)

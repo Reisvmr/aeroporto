@@ -82,7 +82,7 @@ ssh -t $USUARIO@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./00-prerequisitos-valid
 ssh -t $USUARIO@10.31.38.64 'cd /tmp/phase-2-ha && sudo ./01-postgresql-primary.sh'
 
 # pg-02 DEPOIS (aguardar pg-01 concluir)
-ssh -t $USUARIO@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./01-postgresql-standby.sh'
+ssh -t $USUARIO@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./02-postgresql-standby.sh'
 ```
 
 ---
@@ -91,10 +91,10 @@ ssh -t $USUARIO@10.31.38.65 'cd /tmp/phase-2-ha && sudo ./01-postgresql-standby.
 
 ```bash
 # vip-01 (Master)
-ssh -t $USUARIO@10.31.38.70 'cd /tmp/phase-2-ha && sudo ./06-vip-haproxy-keepalived.sh master'
+ssh -t $USUARIO@10.31.38.70 'cd /tmp/phase-2-ha && sudo ./03-vip-haproxy-keepalived.sh master'
 
 # vip-02 (Backup)
-ssh -t $USUARIO@10.31.38.71 'cd /tmp/phase-2-ha && sudo ./06-vip-haproxy-keepalived.sh backup'
+ssh -t $USUARIO@10.31.38.71 'cd /tmp/phase-2-ha && sudo ./03-vip-haproxy-keepalived.sh backup'
 ```
 
 ---
@@ -103,10 +103,10 @@ ssh -t $USUARIO@10.31.38.71 'cd /tmp/phase-2-ha && sudo ./06-vip-haproxy-keepali
 
 ```bash
 # zbx-server-01 (node1) 
-ssh -t $USUARIO@10.31.38.60 'cd /tmp/phase-2-ha && sudo ./02-zabbix-server-ha.sh node1'
+ssh -t $USUARIO@10.31.38.60 'cd /tmp/phase-2-ha && sudo ./04-zabbix-server-ha.sh node1'
 
 # zbx-server-02 (node2)
-ssh -t $USUARIO@10.31.38.61 'cd /tmp/phase-2-ha && sudo ./02-zabbix-server-ha.sh node2'
+ssh -t $USUARIO@10.31.38.61 'cd /tmp/phase-2-ha && sudo ./04-zabbix-server-ha.sh node2'
 ```
 
 ---
@@ -127,10 +127,10 @@ ssh -t $USUARIO@10.31.38.67 'cd /tmp/phase-2-ha && sudo ./05-grafana-ha.sh node2
 
 ```bash
 # awx-01 (node1)
-ssh -t $USUARIO@10.31.38.68 'cd /tmp/phase-2-ha && sudo ./04-awx-ha.sh node1'
+ssh -t $USUARIO@10.31.38.68 'cd /tmp/phase-2-ha && sudo ./06-awx-ha.sh node1'
 
 # awx-02 (node2)
-ssh -t $USUARIO@10.31.38.69 'cd /tmp/phase-2-ha && sudo ./04-awx-ha.sh node2'
+ssh -t $USUARIO@10.31.38.69 'cd /tmp/phase-2-ha && sudo ./06-awx-ha.sh node2'
 ```
 
 ---
@@ -139,10 +139,10 @@ ssh -t $USUARIO@10.31.38.69 'cd /tmp/phase-2-ha && sudo ./04-awx-ha.sh node2'
 
 ```bash
 # Executar em qualquer servidor com acesso à rede
-sudo ./09-validate-ha-health.sh
+sudo ./08-validate-ha-health.sh
 
 # Testar failover (dry-run por padrão)
-sudo ./10-failover-test.sh
+sudo ./09-failover-test.sh
 ```
 
 ---

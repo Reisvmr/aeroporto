@@ -1,8 +1,8 @@
 # 📊 TUTORIAL — Zabbix Server 7.0 HA
-> **Script:** `02-zabbix-server-ha.sh`  
+> **Script:** `04-zabbix-server-ha.sh`  
 > **Objetivo:** Instalar Zabbix Server 7.0 LTS em cluster HA (dois nós)  
 > **Servidores:** zbx-server-01 (`10.31.38.60`) e zbx-server-02 (`10.31.38.61`)  
-> **Uso:** `sudo ./02-zabbix-server-ha.sh <node1|node2>`
+> **Uso:** `sudo ./04-zabbix-server-ha.sh <node1|node2>`
 
 ---
 

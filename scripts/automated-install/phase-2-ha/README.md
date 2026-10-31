@@ -55,14 +55,14 @@
   ```
   ✓ INSTALAÇÃO CONCLUÍDA COM SUCESSO
   ```
-- **Próximo passo:** Executar `01-postgresql-standby.sh` em pg-02
+- **Próximo passo:** Executar `02-postgresql-standby.sh` em pg-02
 
 ---
 
-#### 3. **01-postgresql-standby.sh** 🐘 (SEMANA 1)
+#### 3. **02-postgresql-standby.sh** 🐘 (SEMANA 1)
 - **Descrição:** Instalação PostgreSQL 16 Standby com replicação streaming
 - **Servidor:** pg-02 (10.31.38.65)
-- **Uso:** `sudo ./01-postgresql-standby.sh`
+- **Uso:** `sudo ./02-postgresql-standby.sh`
 - **Pré-requisitos:**
   - PostgreSQL Primary (pg-01) já instalado e rodando
   - Executar validação: `00-prerequisitos-validacao.sh postgresql-standby`
@@ -81,21 +81,21 @@
   # Em pg-01:
   psql -c "SELECT * FROM pg_stat_replication;"
   ```
-- **Próximo passo:** Executar `06-vip-haproxy-keepalived.sh` em vip-01/vip-02
+- **Próximo passo:** Executar `03-vip-haproxy-keepalived.sh` em vip-01/vip-02
 
 ---
 
-#### 4. **06-vip-haproxy-keepalived.sh** ⚖️ (SEMANA 2)
+#### 4. **03-vip-haproxy-keepalived.sh** ⚖️ (SEMANA 2)
 - **Descrição:** Instalação HAProxy + Keepalived para VIP HA Load Balancer
 - **Servidores:** vip-01 (10.31.38.70 - Master) / vip-02 (10.31.38.71 - Backup)
-- **Uso:** `sudo ./06-vip-haproxy-keepalived.sh <master|backup>`
+- **Uso:** `sudo ./03-vip-haproxy-keepalived.sh <master|backup>`
 - **Exemplo:**
   ```bash
   # Em vip-01:
-  sudo ./06-vip-haproxy-keepalived.sh master
+  sudo ./03-vip-haproxy-keepalived.sh master
   
   # Em vip-02:
-  sudo ./06-vip-haproxy-keepalived.sh backup
+  sudo ./03-vip-haproxy-keepalived.sh backup
   ```
 - **Pré-requisitos:**
   - Executar validação: `00-prerequisitos-validacao.sh vip`
@@ -132,7 +132,7 @@ sudo ./00-prerequisitos-validacao.sh <tipo>
 sudo ./01-postgresql-primary.sh
 
 # Em pg-02:
-sudo ./01-postgresql-standby.sh
+sudo ./02-postgresql-standby.sh
 
 # Validação:
 psql -c "SELECT * FROM pg_stat_replication;"
@@ -142,11 +142,11 @@ psql -c "SELECT * FROM pg_stat_replication;"
 ```bash
 # Em vip-01:
 sudo ./00-prerequisitos-validacao.sh vip
-sudo ./06-vip-haproxy-keepalived.sh master
+sudo ./03-vip-haproxy-keepalived.sh master
 
 # Em vip-02:
 sudo ./00-prerequisitos-validacao.sh vip
-sudo ./06-vip-haproxy-keepalived.sh backup
+sudo ./03-vip-haproxy-keepalived.sh backup
 
 # Validação:
 curl http://10.31.38.70/stats
@@ -155,7 +155,7 @@ curl http://10.31.38.70/stats
 ### **SEMANA 3: Zabbix HA** (~4 horas)
 ```bash
 # Scripts a criar:
-# - 02-zabbix-server-ha.sh (zbx-server-01/02)
+# - 04-zabbix-server-ha.sh (zbx-server-01/02)
 ```
 
 ### **SEMANA 4: Grafana HA** (~3 horas)
@@ -167,7 +167,7 @@ curl http://10.31.38.70/stats
 ### **SEMANA 5: AWX HA** (~4 horas)
 ```bash
 # Scripts a criar:
-# - 04-awx-ha.sh (awx-01/02)
+# - 06-awx-ha.sh (awx-01/02)
 ```
 
 ### **SEMANA 6: Validação e Testes** (~4 horas)
@@ -191,7 +191,7 @@ export REPLICATION_PASS="senha_replicacao"
 
 # Keepalived
 export INTERFACE="eth0"  # Se não for detectada automaticamente
-./06-vip-haproxy-keepalived.sh master
+./03-vip-haproxy-keepalived.sh master
 ```
 
 ---
@@ -208,20 +208,20 @@ export INTERFACE="eth0"  # Se não for detectada automaticamente
 ┌─────────────────────────────────────┐
 │  POSTGRESQL HA (Semana 1)           │
 │  01-postgresql-primary.sh (pg-01)   │
-│  01-postgresql-standby.sh (pg-02)   │
+│  02-postgresql-standby.sh (pg-02)   │
 └────────┬────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────┐
 │  VIP LOAD BALANCER (Semana 2)       │
-│  06-vip-haproxy-keepalived.sh       │
+│  03-vip-haproxy-keepalived.sh       │
 │  (vip-01 master, vip-02 backup)     │
 └────────┬────────────────────────────┘
          │
          ▼
 ┌─────────────────────────────────────┐
 │  ZABBIX HA (Semana 3)               │
-│  02-zabbix-server-ha.sh             │
+│  04-zabbix-server-ha.sh             │
 │  (zbx-server-01/02)                 │
 └────────┬────────────────────────────┘
          │
@@ -235,7 +235,7 @@ export INTERFACE="eth0"  # Se não for detectada automaticamente
          ▼
 ┌─────────────────────────────────────┐
 │  AWX HA (Semana 5)                  │
-│  04-awx-ha.sh                       │
+│  06-awx-ha.sh                       │
 │  (awx-01/02)                        │
 └────────┬────────────────────────────┘
          │
