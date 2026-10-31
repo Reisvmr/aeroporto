@@ -103,14 +103,15 @@ sudo -u postgres test -w /var/lib/postgresql/16/data \
 # Ele conecta no pg-01 (Primary) e copia toda a base para o diretório local
 # -P = progresso, -v = verbose, -R = cria standby.signal + postgresql.auto.conf
 # --slot = cria replication slot no Primary
+# Caso não existe rode o comando abaixo
 #sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/postgresql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
-
+# Se já existir
 sudo -u postgres pg_basebackup \
   -h 10.31.38.64 \
   -D /var/lib/postgresql/16/data  \
   -U replication \
   -P -v -W -R \
-  --slot=standby_slot
+  --slot=standby_slot 
 ```
 
 > 💬 Será solicitada a senha do usuário `replication` — insira `${REPLICATION_PASS:-repl123}`
