@@ -164,15 +164,23 @@ INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
 
 cat > /etc/keepalived/keepalived.conf << EOF
 global_defs {
-    router_id vip-01
+    notification_email {
+        admin@aeroporto.local
+    }
+    notification_email_from keepalived@aeroporto.local
+    smtp_server localhost
+    smtp_connect_timeout 30
+    router_id AEROPORTO_HA
     script_user root
     enable_script_security
 }
 
-vrrp_script chk_haproxy {
-    script "killall -0 haproxy"
-    interval 2
+vrrp_script check_haproxy {
+    script "/etc/keepalived/check_haproxy.sh"
+    interval 5
     weight 2
+    fall 2
+    rise 2
 }
 
 vrrp_instance VI_1 {
@@ -181,19 +189,23 @@ vrrp_instance VI_1 {
     virtual_router_id 50
     priority 100
     advert_int 1
-
+    unicast_src_ip 10.31.38.70
+    unicast_peer {
+        10.31.38.71
+    }
     authentication {
         auth_type PASS
-        auth_pass AeroportoHA2026
+        auth_pass aeroporto_ha
     }
-
     virtual_ipaddress {
-        10.31.38.70
+        10.31.38.72/24
     }
-
     track_script {
-        chk_haproxy
+        check_haproxy
     }
+    notify_master "/etc/keepalived/notify_master.sh"
+    notify_backup "/etc/keepalived/notify_backup.sh"
+    notify_fault  "/etc/keepalived/notify_fault.sh"
 }
 EOF
 ```
@@ -205,15 +217,23 @@ INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
 
 cat > /etc/keepalived/keepalived.conf << EOF
 global_defs {
-    router_id vip-02
+    notification_email {
+        admin@aeroporto.local
+    }
+    notification_email_from keepalived@aeroporto.local
+    smtp_server localhost
+    smtp_connect_timeout 30
+    router_id AEROPORTO_HA
     script_user root
     enable_script_security
 }
 
-vrrp_script chk_haproxy {
-    script "killall -0 haproxy"
-    interval 2
+vrrp_script check_haproxy {
+    script "/etc/keepalived/check_haproxy.sh"
+    interval 5
     weight 2
+    fall 2
+    rise 2
 }
 
 vrrp_instance VI_1 {
@@ -222,19 +242,23 @@ vrrp_instance VI_1 {
     virtual_router_id 50
     priority 99
     advert_int 1
-
-    authentication {
-        auth_type PASS
-        auth_pass AeroportoHA2026
-    }
-
-    virtual_ipaddress {
+    unicast_src_ip 10.31.38.71
+    unicast_peer {
         10.31.38.70
     }
-
-    track_script {
-        chk_haproxy
+    authentication {
+        auth_type PASS
+        auth_pass aeroporto_ha
     }
+    virtual_ipaddress {
+        10.31.38.72/24
+    }
+    track_script {
+        check_haproxy
+    }
+    notify_master "/etc/keepalived/notify_master.sh"
+    notify_backup "/etc/keepalived/notify_backup.sh"
+    notify_fault  "/etc/keepalived/notify_fault.sh"
 }
 EOF
 ```
