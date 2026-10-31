@@ -47,6 +47,14 @@ timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432" || echo 
 > 📌 **Não testar Zabbix/Grafana/AWX aqui** — esses serviços ainda não foram instalados.  
 > Os backends são criados com `disabled` e habilitados nas semanas 3-5.
 
+> **Os backends são ativados automaticamente pelos próprios scripts de instalação:**
+> - **Semana 3** → Zabbix: `04-zabbix-server-ha.sh` ativa `backend_zabbix` via SSH nos VIPs
+> - **Semana 4** → Grafana: `05-grafana-ha.sh` ativa `backend_grafana` via SSH nos VIPs
+> - **Semana 5** → AWX: `06-awx-ha.sh` ativa `backend_awx` via SSH nos VIPs
+>
+> Cada script conecta em vip-01 (`10.31.38.70`) e vip-02 (`10.31.38.71`) ao final da instalação.
+> Se o SSH não estiver disponível, o script exibe os comandos manuais.
+
 ---
 
 ## ETAPA 2 — Instalar HAProxy + Keepalived (feito pelo script)

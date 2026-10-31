@@ -278,4 +278,51 @@ docker stats --no-stream
 
 # Logs
 docker logs -f awx_web
+
+---
+
+## ⚡ ETAPA FINAL — Ativação do Backend no HAProxy
+
+> Esta etapa é executada **automaticamente** pelo script `06-awx-ha.sh` ao final da instalação.
+> Se o SSH para vip-01/vip-02 não estiver disponível, execute manualmente.
+
+### Execução automática (pelo script)
+
+O script conecta via SSH em **vip-01** (`10.31.38.70`) e **vip-02** (`10.31.38.71`) e:
+1. Ativa os backends via **HAProxy Runtime API** (efeito imediato, sem interrupção)
+2. Atualiza `/etc/haproxy/haproxy.cfg` (persistência após restart)
+3. Executa `systemctl reload haproxy`
+
+### Execução manual (se SSH falhar)
+
+Execute em **vip-01 E em vip-02**:
+
+```bash
+# 1. Ativar via Runtime API (imediato, sem reload)
+echo 'enable server backend_awx/awx_01' | socat /run/haproxy/admin.sock stdio
+echo 'enable server backend_awx/awx_02' | socat /run/haproxy/admin.sock stdio
+
+# 2. Atualizar config (persistência)
+sed -i 's/awx_01 10.31.38.68:8080 disabled/awx_01 10.31.38.68:8080 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
+sed -i 's/awx_02 10.31.38.69:8080 disabled/awx_02 10.31.38.69:8080 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
+
+# 3. Validar config e recarregar
+haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl reload haproxy
+```
+
+### Validação pós-ativação (executar nos VIPs)
+
+```bash
+# Status dos backends AWX
+echo 'show servers state backend_awx' | socat /run/haproxy/admin.sock stdio
+
+# Stats web (confirmar backends UP)
+curl -s 'http://10.31.38.70:8404/stats' | grep -i awx
+
+# Acesso via VIP flutuante
+curl -sk http://10.31.38.72:8080/api/v2/ping/ -w "HTTP: %{http_code}\n"
+```
+
+> ✅ Backends devem aparecer como **UP** nas stats: `http://10.31.38.70:8404/stats`
+
 ```

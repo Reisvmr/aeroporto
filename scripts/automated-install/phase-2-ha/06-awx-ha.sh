@@ -17,7 +17,7 @@
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
 #   - Docker e Docker Compose instalados
-#   - VIP 10.31.38.70 já configurado (HAProxy+Keepalived)
+#   - VIP flutuante 10.31.38.72 já configurado (HAProxy+Keepalived em vip-01/vip-02)
 #   - IPs estáticos: 10.31.38.68 (node1) / 10.31.38.69 (node2)
 #
 # Configura:
@@ -100,7 +100,7 @@ print_header() {
     echo "║  Node Type: $NODE_TYPE"
     echo "║  Cluster: awx-01 + awx-02                                         ║"
     echo "║  Database: PostgreSQL HA (10.31.38.64)                           ║"
-    echo "║  VIP: 10.31.38.70 (HAProxy)                                      ║"
+    echo "║  VIP: 10.31.38.72 (flutuante / HAProxy em vip-01/vip-02)          ║"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -464,6 +464,48 @@ gerar_relatorio() {
     echo "" | tee -a "$LOG_FILE"
 }
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ATIVAR BACKEND AWX NO HAPROXY (vip-01 / vip-02)
+# ═══════════════════════════════════════════════════════════════════════════
+ativar_backend_haproxy() {
+    local VIPS=("10.31.38.70" "10.31.38.71")
+    local ativados=0
+
+    print_info "Ativando backend AWX no HAProxy (vip-01 e vip-02)..."
+
+    for vip_ip in "${VIPS[@]}"; do
+        if timeout 5 bash -c "</dev/tcp/${vip_ip}/22" 2>/dev/null; then
+            print_info "  -> SSH em ${vip_ip}..."
+            if ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 root@"${vip_ip}" \
+                'socat_ok=0; command -v socat &>/dev/null && [ -S /run/haproxy/admin.sock ] && socat_ok=1
+                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_awx/awx_01" | socat /run/haproxy/admin.sock stdio
+                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_awx/awx_02" | socat /run/haproxy/admin.sock stdio
+                 sed -i "s|awx_01 10.31.38.68:8080 disabled|awx_01 10.31.38.68:8080 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
+                 sed -i "s|awx_02 10.31.38.69:8080 disabled|awx_02 10.31.38.69:8080 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
+                 haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl reload haproxy'; then
+                print_ok "  v Backend AWX ativado em ${vip_ip}"
+                ativados=$((ativados + 1))
+            else
+                print_warning "  x Falha ao ativar em ${vip_ip}"
+            fi
+        else
+            print_warning "  x ${vip_ip}:22 inacessivel — ative manualmente"
+        fi
+    done
+
+    if [ "$ativados" -lt 2 ]; then
+        echo ""
+        print_warning "Execute manualmente em CADA vip (vip-01 E vip-02):"
+        echo "  echo 'enable server backend_awx/awx_01' | socat /run/haproxy/admin.sock stdio"
+        echo "  echo 'enable server backend_awx/awx_02' | socat /run/haproxy/admin.sock stdio"
+        echo "  sed -i 's/awx_01 10.31.38.68:8080 disabled/awx_01 10.31.38.68:8080 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
+        echo "  sed -i 's/awx_02 10.31.38.69:8080 disabled/awx_02 10.31.38.69:8080 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
+        echo "  systemctl reload haproxy"
+        echo "  # Stats: http://10.31.38.70:8404/stats"
+    fi
+}
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════
@@ -484,6 +526,7 @@ main() {
     iniciar_awx || exit 1
     testar_awx || exit 1
     configurar_firewall || exit 1
+    ativar_backend_haproxy
     gerar_relatorio
     
     print_ok "✓ INSTALAÇÃO CONCLUÍDA COM SUCESSO"
