@@ -276,7 +276,7 @@ ssh root@10.31.38.64 "sudo -u postgres psql -c 'SELECT pg_is_in_recovery();'"
 # Esperado: f (primary)
 
 # 2. Parar pg-01
-ssh root@10.31.38.64 "systemctl stop postgresql"
+ssh root@10.31.38.64 "systemctl stop postgresql@16-main"
 
 # 3. Promover pg-02 para primary
 ssh root@10.31.38.65 "sudo -u postgres pg_ctl promote -D /var/lib/postgresql/16/main"

@@ -104,7 +104,7 @@ test_postgresql_failover() {
     
     print_info "Passos para failover real (manual):"
     echo "  1. SSH em pg-01: ssh root@10.31.38.64"
-    echo "  2. Parar PostgreSQL: systemctl stop postgresql"
+    echo "  2. Parar PostgreSQL: systemctl stop postgresql@16-main"
     echo "  3. Aguardar 5-10 segundos (tempo de detecção)"
     echo "  4. Verificar em pg-02: pg_controldata /var/lib/postgresql/16/main/"
     echo "  5. Promover standby: pg_ctl promote -D /var/lib/postgresql/16/main/"

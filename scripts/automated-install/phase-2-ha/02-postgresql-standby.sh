@@ -193,7 +193,7 @@ configurar_standby() {
     print_section "CONFIGURAÇÃO DE STANDBY"
     
     print_info "Parando PostgreSQL..."
-    systemctl stop postgresql 2>&1 | tee -a "$LOG_FILE"
+    systemctl stop postgresql@16-main 2>&1 | tee -a "$LOG_FILE"
     
     print_info "Limpando data directory..."
     sudo -u postgres rm -rf "$PG_DATA"/* 2>&1 | tee -a "$LOG_FILE"
@@ -258,12 +258,12 @@ iniciar_postgresql() {
     print_section "INICIALIZAÇÃO DO POSTGRESQL"
     
     print_info "Iniciando PostgreSQL..."
-    systemctl start postgresql 2>&1 | tee -a "$LOG_FILE"
+    systemctl start postgresql@16-main 2>&1 | tee -a "$LOG_FILE"
     
     sleep 5
     
     # Verificar status
-    if systemctl is-active --quiet postgresql; then
+    if systemctl is-active --quiet postgresql@16-main; then
         print_ok "PostgreSQL iniciado com sucesso"
     else
         print_erro "Falha ao iniciar PostgreSQL"

@@ -195,7 +195,7 @@ CREATE USER $REPLICATION_USER WITH REPLICATION ENCRYPTED PASSWORD '$REPLICATION_
 EOF
     
     print_info "Parando PostgreSQL para configurar arquivos..."
-    systemctl stop postgresql 2>&1 | tee -a "$LOG_FILE"
+    systemctl stop postgresql@16-main 2>&1 | tee -a "$LOG_FILE"
     
     print_info "Configurando postgresql.conf..."
     
@@ -263,7 +263,7 @@ criar_databases() {
     print_section "CRIAÇÃO DE BANCOS DE DADOS"
     
     print_info "Iniciando PostgreSQL..."
-    systemctl start postgresql 2>&1 | tee -a "$LOG_FILE"
+    systemctl start postgresql@16-main 2>&1 | tee -a "$LOG_FILE"
     
     sleep 3
     
