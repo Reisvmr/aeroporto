@@ -1,51 +1,71 @@
 # ⚖️ TUTORIAL — VIP HAProxy + Keepalived
-> **Script:** `03-vip-haproxy-keepalived.sh`  
-> **Objetivo:** Instalar HAProxy + Keepalived com VIP flutuante para load balancing HA  
-> **Servidores:** vip-01 (`10.31.38.70` - Master) e vip-02 (`10.31.38.71` - Backup)  
-> **Uso:** `sudo ./03-vip-haproxy-keepalived.sh <master|backup>`
+
+> **Script:** `03-vip-haproxy-keepalived.sh`
+> **Objetivo:** Instalar HAProxy + Keepalived com VIP flutuante para load balancing HA
+> **Servidores:** vip-01 (`10.31.38.70` - Master) e vip-02 (`10.31.38.71` - Backup)
+> **VIP flutuante:** `10.31.38.72` — migra automaticamente em failover
+
+---
+
+## 🗺️ Visão geral de execução
+
+| Etapa | vip-01 (`10.31.38.70`) | vip-02 (`10.31.38.71`) |
+|-------|------------------------|------------------------|
+| Script | `sudo ./03-vip-haproxy-keepalived.sh master` | `sudo ./03-vip-haproxy-keepalived.sh backup` |
+| 1 — Pré-requisitos | ✅ executar | ✅ executar |
+| 2 — Instalar pacotes | ✅ executar | ✅ executar |
+| 3 — Configurar HAProxy | ✅ mesma config | ✅ mesma config |
+| 4 — Configurar Keepalived | ✅ config MASTER | ✅ config BACKUP |
+| 5 — IP forwarding + firewall | ✅ executar | ✅ executar |
+| 6 — Iniciar serviços | ✅ executar | ✅ executar |
+| 7 — Teste de failover | ✅ simular falha aqui | ✅ verificar VIP migrado |
 
 ---
 
 ## 📋 Pré-requisitos
 
-> ⚠️ **Esta etapa é executada na Semana 2.**  
-> Neste ponto apenas o PostgreSQL (Semana 1) está instalado.  
-> Zabbix (Semana 3), Grafana (Semana 4) e AWX (Semana 5) serão configurados depois —  
-> os seus backends no HAProxy são criados já **desabilitados** (`disabled`) e  
+> ⚠️ **Esta etapa é executada na Semana 2.**
+> Neste ponto apenas o PostgreSQL (Semana 1) está instalado.
+> Zabbix (Semana 3), Grafana (Semana 4) e AWX (Semana 5) serão configurados depois —
+> os seus backends no HAProxy são criados já **desabilitados** (`disabled`) e
 > ativados automaticamente pelos respectivos scripts de instalação.
 
-- ✅ PostgreSQL HA concluído (pg-01 `10.31.38.64` + pg-02 `10.31.38.65`)  
-- IPs estáticos configurados: vip-01 `10.31.38.70` · vip-02 `10.31.38.71` · VIP flutuante `10.31.38.72`  
-- Ambos os servidores na mesma sub-rede `/24` (necessário para VRRP unicast)  
-- Acesso root/sudo em vip-01 e vip-02  
-
----
-
-## 🔧 Variáveis — defina antes de executar
-
-Não há variáveis obrigatórias. O script detecta automaticamente a interface de rede.
+- ✅ PostgreSQL HA concluído (pg-01 `10.31.38.64` + pg-02 `10.31.38.65`)
+- IPs estáticos configurados: vip-01 `10.31.38.70` · vip-02 `10.31.38.71` · VIP flutuante `10.31.38.72`
+- Ambos os servidores na mesma sub-rede `/24` (necessário para VRRP unicast)
+- Acesso root/sudo em vip-01 e vip-02
 
 ---
 
 ## ETAPA 1 — Verificar pré-requisitos
 
+> 🖥️ **Execute em: vip-01 E vip-02** (cada servidor verifica o próprio ambiente)
+
 ```bash
-# IP do servidor
-hostname -I | awk '{print $1}'   # master: 10.31.38.70 | backup: 10.31.38.71
+# Confirmar IP do servidor atual
+hostname -I | awk '{print $1}'
+# Esperado: 10.31.38.70 (vip-01) | 10.31.38.71 (vip-02)
 
 # Verificar interface de rede padrão
 ip route | grep default | awk '{print $5}' | head -1
 
-# Confirmar conectividade entre vip-01 e vip-02 (VRRP unicast)
-ping -c 2 10.31.38.71   # executar no vip-01
-ping -c 2 10.31.38.70   # executar no vip-02
-
-# Confirmar que PostgreSQL está acessível via pg-01
+# Confirmar que PostgreSQL está acessível
 timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432" || echo "✗ pg-01:5432"
 ```
 
-> 📌 **Não testar Zabbix/Grafana/AWX aqui** — esses serviços ainda não foram instalados.  
-> Os backends são criados com `disabled` e habilitados nas semanas 3-5.
+> 🖥️ **Execute em: vip-01** (testar conectividade com vip-02)
+
+```bash
+ping -c 2 10.31.38.71   # vip-01 → vip-02 (unicast VRRP)
+```
+
+> 🖥️ **Execute em: vip-02** (testar conectividade com vip-01)
+
+```bash
+ping -c 2 10.31.38.70   # vip-02 → vip-01 (unicast VRRP)
+```
+
+> 📌 **Não testar Zabbix/Grafana/AWX aqui** — esses serviços ainda não foram instalados.
 
 > **Os backends são ativados automaticamente pelos próprios scripts de instalação:**
 > - **Semana 3** → Zabbix: `04-zabbix-server-ha.sh` ativa `backend_zabbix` via SSH nos VIPs
@@ -57,7 +77,9 @@ timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432" || echo 
 
 ---
 
-## ETAPA 2 — Instalar HAProxy + Keepalived (feito pelo script)
+## ETAPA 2 — Instalar HAProxy + Keepalived
+
+> 🖥️ **Execute em: vip-01 E vip-02** (mesmos pacotes nos dois servidores)
 
 O script `03-vip-haproxy-keepalived.sh` executa automaticamente:
 
@@ -65,15 +87,21 @@ O script `03-vip-haproxy-keepalived.sh` executa automaticamente:
 # O que o script faz (não precisa rodar manualmente):
 apt-get update
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-apt-get install -y haproxy
-apt-get install -y keepalived
+apt-get install -y haproxy keepalived socat
 ```
 
-✅ **Verificação pós-script:** `haproxy -v && keepalived --version`
+✅ **Verificação pós-instalação:**
+```bash
+haproxy -v
+keepalived --version
+command -v socat && echo "socat ok"
+```
 
 ---
 
 ## ETAPA 3 — Configurar HAProxy
+
+> 🖥️ **Execute em: vip-01 E vip-02** (configuração idêntica nos dois servidores)
 
 ```bash
 # Backup da configuração original
@@ -104,39 +132,39 @@ defaults
 frontend zabbix_front
     bind *:80
     acl is_zabbix path_beg /zabbix
-    use_backend zabbix_back if is_zabbix
-    default_backend zabbix_back
+    use_backend backend_zabbix if is_zabbix
+    default_backend backend_zabbix
 
-backend zabbix_back
+backend backend_zabbix
     balance roundrobin
     option httpchk GET /zabbix/
     # DISABLED — ativado pelo 04-zabbix-server-ha.sh (Semana 3)
-    server zbx-01 10.31.38.60:80 disabled
-    server zbx-02 10.31.38.61:80 disabled
+    server zabbix_01 10.31.38.60:80 disabled
+    server zabbix_02 10.31.38.61:80 disabled
 
 # ── Grafana ───────────────────────────────────────────────────────────────
 frontend grafana_front
     bind *:3000
-    default_backend grafana_back
+    default_backend backend_grafana
 
-backend grafana_back
+backend backend_grafana
     balance roundrobin
     option httpchk GET /api/health
     # DISABLED — ativado pelo 05-grafana-ha.sh (Semana 4)
-    server grafana-01 10.31.38.66:3000 disabled
-    server grafana-02 10.31.38.67:3000 disabled
+    server grafana_01 10.31.38.66:3000 disabled
+    server grafana_02 10.31.38.67:3000 disabled
 
 # ── AWX ──────────────────────────────────────────────────────────────────
 frontend awx_front
     bind *:8080
-    default_backend awx_back
+    default_backend backend_awx
 
-backend awx_back
+backend backend_awx
     balance roundrobin
     option httpchk GET /api/v2/ping/
     # DISABLED — ativado pelo 06-awx-ha.sh (Semana 5)
-    server awx-01 10.31.38.68:8080 disabled
-    server awx-02 10.31.38.69:8080 disabled
+    server awx_01 10.31.38.68:8080 disabled
+    server awx_02 10.31.38.69:8080 disabled
 
 # ── Stats ─────────────────────────────────────────────────────────────────
 listen stats
@@ -157,7 +185,11 @@ haproxy -c -f /etc/haproxy/haproxy.cfg
 
 ## ETAPA 4 — Configurar Keepalived (VRRP Failover)
 
-### 4.1 — MASTER (vip-01: 10.31.38.70)
+> ⚠️ **As configurações 4.1 e 4.2 são DIFERENTES** — cada servidor tem o seu próprio arquivo.
+
+### 4.1 — MASTER
+
+> 🖥️ **Execute SOMENTE em: vip-01 (`10.31.38.70`)**
 
 ```bash
 INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
@@ -210,7 +242,9 @@ vrrp_instance VI_1 {
 EOF
 ```
 
-### 4.2 — BACKUP (vip-02: 10.31.38.71)
+### 4.2 — BACKUP
+
+> 🖥️ **Execute SOMENTE em: vip-02 (`10.31.38.71`)**
 
 ```bash
 INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
@@ -267,55 +301,92 @@ EOF
 
 ## ETAPA 5 — Habilitar IP forwarding e configurar firewall
 
+> 🖥️ **Execute em: vip-01 E vip-02** (configuração idêntica nos dois servidores)
+
 ```bash
-# IP forwarding (necessário para o VIP)
+# IP forwarding — permite ao kernel atribuir o VIP flutuante
 echo "net.ipv4.ip_nonlocal_bind = 1" >> /etc/sysctl.conf
 sysctl -p
 
-# Firewall — liberar portas dos serviços
-ufw allow 80/tcp comment "HAProxy Zabbix"
-ufw allow 3000/tcp comment "HAProxy Grafana"
-ufw allow 8080/tcp comment "HAProxy AWX"
-ufw allow 8404/tcp comment "HAProxy Stats"
-ufw allow 112 comment "VRRP Keepalived"
+# Firewall — liberar portas dos serviços e VRRP
+ufw allow 80/tcp    comment "HAProxy → Zabbix"
+ufw allow 3000/tcp  comment "HAProxy → Grafana"
+ufw allow 8080/tcp  comment "HAProxy → AWX"
+ufw allow 8404/tcp  comment "HAProxy Stats"
+ufw allow 112       comment "VRRP Keepalived (unicast)"
+ufw allow ssh
+ufw --force enable
+ufw status verbose
 ```
 
 ---
 
 ## ETAPA 6 — Iniciar HAProxy e Keepalived
 
+> 🖥️ **Execute em: vip-01 E vip-02** (mesmos comandos nos dois servidores)
+
 ```bash
 systemctl enable haproxy keepalived
 systemctl restart haproxy keepalived
 
 # Verificar status
-systemctl status haproxy
-systemctl status keepalived
+systemctl status haproxy  --no-pager
+systemctl status keepalived --no-pager
 ```
 
-✅ **Verificação:**
-```bash
-# VIP deve estar no MASTER
-ip addr show | grep 10.31.38.70   # deve aparecer apenas no vip-01
+✅ **Verificação do VIP flutuante:**
 
-# Stats HAProxy
+> 🖥️ **Execute em: vip-01** (VIP deve estar ativo aqui após o start)
+
+```bash
+# VIP flutuante deve aparecer em vip-01 (MASTER)
+ip addr show | grep 10.31.38.72
+# Saída esperada: inet 10.31.38.72/24 ...
+```
+
+> 🖥️ **Execute em: vip-02** (VIP NÃO deve aparecer aqui enquanto vip-01 estiver UP)
+
+```bash
+# VIP flutuante NÃO deve aparecer no BACKUP enquanto o MASTER estiver ativo
+ip addr show | grep 10.31.38.72
+# Saída esperada: (vazia)
+```
+
+```bash
+# Stats HAProxy (executar em qualquer um dos dois)
 curl -s -u admin:haproxy@stats http://localhost:8404/stats | head -5
 ```
 
 ---
 
-## ETAPA 7 — Verificação de failover manual
+## ETAPA 7 — Teste de failover manual
+
+> 🖥️ **Execute em: vip-01** — simular falha do HAProxy (MASTER)
 
 ```bash
-# No vip-01 (MASTER) — simular falha do HAProxy
 systemctl stop haproxy
-sleep 3
+sleep 5
+```
 
-# Em outro terminal, verificar que VIP migrou para vip-02:
-# ssh root@10.31.38.71 "ip addr show | grep 10.31.38.70"
+> 🖥️ **Execute em: vip-02** — verificar que o VIP migrou para cá
 
-# Restaurar:
+```bash
+# VIP 10.31.38.72 deve aparecer agora em vip-02
+ip addr show | grep 10.31.38.72
+# Saída esperada: inet 10.31.38.72/24 ...
+
+# Confirmar via log
+tail -5 /var/log/keepalived_notify.log
+```
+
+> 🖥️ **Execute em: vip-01** — restaurar serviço (VIP volta automaticamente)
+
+```bash
 systemctl start haproxy
+sleep 5
+
+# VIP deve ter voltado para vip-01
+ip addr show | grep 10.31.38.72
 ```
 
 ⏱️ **RTO esperado:** < 5 segundos
@@ -324,21 +395,35 @@ systemctl start haproxy
 
 ## 📝 Próximos passos
 
-1. Execute em **vip-02** com argumento `backup`  
-2. Teste acesso via VIP: `http://10.31.38.70` (Zabbix), `http://10.31.38.72:3000` (Grafana)  
-3. Prossiga com `07-pre-execution-validation.sh` para validação final  
+1. Execute o script em **vip-02** com `sudo ./03-vip-haproxy-keepalived.sh backup`
+2. Após Semana 3: acesse Zabbix via `http://10.31.38.72/zabbix`
+3. Após Semana 4: acesse Grafana via `http://10.31.38.72:3000`
+4. Após Semana 5: acesse AWX via `http://10.31.38.72:8080`
+5. Prossiga com `07-pre-execution-validation.sh` para validação final
 
 ---
 
 ## 🔍 Monitoramento
 
+> 🖥️ **Execute em: vip-01 OU vip-02** (qualquer um dos dois)
+
 ```bash
 # Status VRRP em tempo real
 journalctl -u keepalived -f
 
-# Stats HAProxy
+# Log de eventos de failover
+tail -f /var/log/keepalived_notify.log
+
+# Stats HAProxy (Runtime API)
 watch -n 2 "echo 'show stat' | socat /run/haproxy/admin.sock stdio | cut -d',' -f1,2,18,19 | column -t -s','"
 
 # Log HAProxy
 tail -f /var/log/haproxy.log
+```
+
+> 🖥️ **Execute em: vip-01** (verificar quem detém o VIP no momento)
+
+```bash
+# Verificar qual servidor está com o VIP ativo
+ip addr show | grep 10.31.38.72 && echo "VIP ATIVO AQUI (MASTER)" || echo "VIP em outro servidor (BACKUP)"
 ```
