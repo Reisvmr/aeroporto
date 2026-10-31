@@ -81,16 +81,36 @@ systemctl stop postgresql
 ```bash
 # ⚠️ ATENÇÃO: isso apaga todos os dados locais — o Standby é recriado a partir do Primary
 sudo -u postgres rm -rf /var/lib/pgsql/16/data/*
+sudo -u postgres rm -rf /var/lib/postgresql/16/data/*
 ```
 
 ### 4.3 — Executar pg_basebackup no Standby (copia dados do Primary)
+### Garantir o proprietário correto
+```bash
+sudo chown -R postgres:postgres /var/lib/postgresql/16/data
+# Ajustar permissões do diretório principal
+sudo chmod 700 /var/lib/postgresql/16/data
+```
+### Testar a capacidade de escrita
+```bash
+sudo -u postgres test -w /var/lib/postgresql/16/data \
+  && echo "OK: postgres pode escrever" \
+  || echo "ERRO: sem permissão de escrita"
+```
 
 ```bash
 # Execute este comando NO pg-02 (Standby)
 # Ele conecta no pg-01 (Primary) e copia toda a base para o diretório local
 # -P = progresso, -v = verbose, -R = cria standby.signal + postgresql.auto.conf
 # --slot = cria replication slot no Primary
-sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/pgsql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
+#sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/postgresql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
+
+sudo -u postgres pg_basebackup \
+  -h 10.31.38.64 \
+  -D /var/lib/postgresql/16/data  \
+  -U replication \
+  -P -v -W -R \
+  --slot=standby_slot
 ```
 
 > 💬 Será solicitada a senha do usuário `replication` — insira `${REPLICATION_PASS:-repl123}`
