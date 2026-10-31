@@ -9,7 +9,7 @@
 ## 📋 Pré-requisitos
 
 - Ubuntu **26.04 LTS (resolute)** atualizado
-- Mínimo 50 GB em `/var`  
+- Mínimo 50 GB em `/var/lib/postgresql`  
 - IP estático configurado: `10.31.38.64`  
 - pg-02 (`10.31.38.65`) acessível na rede  
 
@@ -35,8 +35,8 @@ id
 # Verificar IP
 hostname -I | awk '{print $1}'   # Deve retornar: 10.31.38.64
 
-# Verificar espaço em /var
-df -BG /var/lib/pgsql | awk 'NR==2{print $4}'   # Deve ser >= 50G
+# Verificar espaço em disco (Ubuntu path)
+df -BG /var/lib/postgresql | awk 'NR==2{print $4}'   # Deve ser >= 50G
 ```
 
 ✅ **Verificação:** IP deve ser `10.31.38.64`, espaço >= 50GB
@@ -72,6 +72,11 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-contr
 
 ✅ **Verificação:** `psql --version`
 
+> ⚠️ **Nota Ubuntu PGDG:**
+> - Config: `/etc/postgresql/16/main/postgresql.conf`
+> - Data: `/var/lib/postgresql/16/main/`
+> - Serviço real: `postgresql@16-main` (não `postgresql-16` nem `postgresql`)
+
 ---
 
 ## ETAPA 4 — Configuração de replicação
@@ -86,20 +91,32 @@ CREATE USER replication WITH REPLICATION ENCRYPTED PASSWORD '${REPLICATION_PASS:
 EOF
 ```
 
-### 4.2 — Parar PostgreSQL
+### 4.2 — Criar replication slot para o Standby
 
 ```bash
-systemctl stop postgresql
+sudo -u postgres psql -c "SELECT pg_create_physical_replication_slot('standby_slot');"
 ```
 
-### 4.3 — Backup do postgresql.conf original
+✅ **Verificação:**
+```bash
+sudo -u postgres psql -c "SELECT slot_name, slot_type, active FROM pg_replication_slots;"
+# Deve mostrar: standby_slot | physical | f
+```
+
+### 4.3 — Parar PostgreSQL
+
+```bash
+systemctl stop postgresql@16-main
+```
+
+### 4.4 — Backup do postgresql.conf original
 
 ```bash
 PG_CONFIG="/etc/postgresql/16/main"
 cp "$PG_CONFIG/postgresql.conf" "$PG_CONFIG/postgresql.conf.backup"
 ```
 
-### 4.4 — Adicionar configurações de replicação ao postgresql.conf
+### 4.5 — Adicionar configurações de replicação ao postgresql.conf
 
 ```bash
 cat >> /etc/postgresql/16/main/postgresql.conf << 'EOF'
@@ -129,15 +146,19 @@ wal_buffers = 16MB
 log_connections = on
 log_disconnections = on
 log_lock_waits = on
-log_statement = 'all'
+log_statement = 'ddl'
 log_replication_commands = on
 
-# Sincronização
-synchronous_commit = remote_apply
+# Sincronização assíncrona (padrão seguro)
+# Para modo síncrono, defina também synchronous_standby_names = 'pg-02'
+synchronous_commit = local
 EOF
 ```
 
-### 4.5 — Backup e configuração do pg_hba.conf
+> ℹ️ `synchronous_commit = local` garante durabilidade local sem bloquear em caso de falha do standby.  
+> Para replicação **síncrona** (RPO zero), altere para `remote_apply` **e** adicione `synchronous_standby_names = 'pg-02'`.
+
+### 4.6 — Backup e configuração do pg_hba.conf
 
 ```bash
 cp /etc/postgresql/16/main/pg_hba.conf /etc/postgresql/16/main/pg_hba.conf.backup
@@ -164,7 +185,7 @@ EOF
 
 ```bash
 # Iniciar PostgreSQL
-systemctl start postgresql
+systemctl start postgresql@16-main
 sleep 3
 ```
 
@@ -183,7 +204,7 @@ ss -tlnp | grep 5432
 >
 > # Forçar a configuração correta (sobrescreve tudo via ALTER SYSTEM)
 > sudo -u postgres psql -c "ALTER SYSTEM SET listen_addresses = '*';"
-> systemctl restart postgresql
+> systemctl restart postgresql@16-main
 > sleep 3
 > ss -tlnp | grep 5432   # Deve mostrar 0.0.0.0:5432
 > ```
@@ -223,13 +244,16 @@ ufw allow 5432/tcp from 10.31.38.69 comment "AWX node2"
 
 ```bash
 # Status do serviço
-systemctl status postgresql
+systemctl status postgresql@16-main
 
 # Teste de conexão local
 sudo -u postgres psql -c "SELECT version();"
 
 # Verificar usuário de replicação
 sudo -u postgres psql -c "\du replication"
+
+# Verificar slot criado
+sudo -u postgres psql -c "SELECT slot_name, slot_type, active FROM pg_replication_slots;"
 
 # Verificar bancos criados
 sudo -u postgres psql -c "\l"
