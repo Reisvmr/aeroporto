@@ -32,8 +32,8 @@ hostname -I | awk '{print $1}'   # Deve retornar: 10.31.38.65
 # Verificar conectividade com Primary (pg-01)
 timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01:5432 acessível" || echo "✗ pg-01:5432 INACESSÍVEL"
 
-# Verificar espaço em disco
-df -BG /var/lib/pgsql | awk 'NR==2{print $4}'   # Deve ser >= 50G
+# Verificar espaço em disco (Ubuntu path)
+df -BG /var/lib/postgresql | awk 'NR==2{print $4}'   # Deve ser >= 50G
 ```
 
 ✅ **Verificação:** IP = `10.31.38.65`, pg-01:5432 acessível, >= 50GB livres
@@ -66,6 +66,9 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-contr
 
 ✅ **Verificação:** `psql --version`
 
+> ⚠️ **Nota Ubuntu PGDG:** O cluster padrão fica em `/var/lib/postgresql/16/main/`.  
+> O serviço real é `postgresql@16-main` (não `postgresql-16` nem `postgresql`).
+
 ---
 
 ## ETAPA 4 — Configurar Standby via pg_basebackup
@@ -73,52 +76,52 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql-16 postgresql-contr
 ### 4.1 — Parar PostgreSQL
 
 ```bash
-systemctl stop postgresql
+systemctl stop postgresql@16-main
 ```
 
 ### 4.2 — Limpar o data directory
 
 ```bash
 # ⚠️ ATENÇÃO: isso apaga todos os dados locais — o Standby é recriado a partir do Primary
-sudo -u postgres rm -rf /var/lib/pgsql/16/data/*
-sudo -u postgres rm -rf /var/lib/postgresql/16/data/*
+# Ubuntu PGDG: o cluster padrão fica em /var/lib/postgresql/16/main/
+sudo -u postgres rm -rf /var/lib/postgresql/16/main/*
 ```
 
 ### 4.3 — Executar pg_basebackup no Standby (copia dados do Primary)
-### Garantir o proprietário correto
+
+#### Garantir permissões corretas
 ```bash
-sudo chown -R postgres:postgres /var/lib/postgresql/16/data
-# Ajustar permissões do diretório principal
-sudo chmod 700 /var/lib/postgresql/16/data
+sudo chown -R postgres:postgres /var/lib/postgresql/16/main
+sudo chmod 700 /var/lib/postgresql/16/main
 ```
-### Testar a capacidade de escrita
+
+#### Testar a capacidade de escrita
 ```bash
-sudo -u postgres test -w /var/lib/postgresql/16/data \
+sudo -u postgres test -w /var/lib/postgresql/16/main \
   && echo "OK: postgres pode escrever" \
   || echo "ERRO: sem permissão de escrita"
 ```
 
+#### Executar o basebackup
 ```bash
 # Execute este comando NO pg-02 (Standby)
 # Ele conecta no pg-01 (Primary) e copia toda a base para o diretório local
 # -P = progresso, -v = verbose, -R = cria standby.signal + postgresql.auto.conf
-# --slot = cria replication slot no Primary
-# Caso não existe rode o comando abaixo
-#sudo -u postgres pg_basebackup     -h 10.31.38.64     -D /var/lib/postgresql/16/data     -U replication     -P -v     -W -R --slot=standby_slot --create-slot
-# Se já existir
+# --slot = usa replication slot existente no Primary (criado pelo script do primary)
+# Se o slot NÃO existir ainda, adicione --create-slot ao comando abaixo
 sudo -u postgres pg_basebackup \
   -h 10.31.38.64 \
-  -D /var/lib/postgresql/16/data  \
+  -D /var/lib/postgresql/16/main \
   -U replication \
   -P -v -W -R \
-  --slot=standby_slot 
+  --slot=standby_slot
 ```
 
 > 💬 Será solicitada a senha do usuário `replication` — insira `${REPLICATION_PASS:-repl123}`
 
 ✅ **Verificação após conclusão:**
 ```bash
-ls -la /var/lib/postgresql/16/data/standby.signal   # Deve existir
+ls -la /var/lib/postgresql/16/main/standby.signal   # Deve existir
 ```
 
 ### 4.4 — Adicionar configurações ao postgresql.conf
@@ -155,9 +158,9 @@ EOF
 
 ```bash
 # Se o -R do pg_basebackup não criou:
-if [[ ! -f /var/lib/postgresql/16/data/standby.signal ]]; then
-    touch /var/lib/postgresql/16/data/standby.signal
-    chown postgres:postgres /var/lib/postgresql/16/data/standby.signal
+if [[ ! -f /var/lib/postgresql/16/main/standby.signal ]]; then
+    touch /var/lib/postgresql/16/main/standby.signal
+    chown postgres:postgres /var/lib/postgresql/16/main/standby.signal
     echo "standby.signal criado manualmente"
 fi
 ```
@@ -167,17 +170,18 @@ fi
 ## ETAPA 5 — Iniciar PostgreSQL Standby
 
 ```bash
-systemctl start postgresql
+systemctl start postgresql@16-main
 sleep 5
 
 # Verificar status
-systemctl status postgresql
+systemctl status postgresql@16-main
 
 # Ver logs de inicialização
-journalctl -u postgresql --no-pager -n 30
+journalctl -u postgresql@16-main --no-pager -n 30
 ```
 
-✅ **Esperado nos logs:** `started streaming WAL from primary`
+✅ **Esperado nos logs:** `started streaming WAL from primary`  
+✅ **Esperado no status:** processo `walreceiver streaming` visível no CGroup
 
 ---
 
