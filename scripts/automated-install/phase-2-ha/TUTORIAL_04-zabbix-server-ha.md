@@ -50,16 +50,22 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 ## ETAPA 3 — Instalar Zabbix Server 7.0
 
 > ℹ️ **Frontend não instalado aqui** — o Zabbix Frontend (Apache/PHP) vai nos servidores zbx-fe-01/02 (tutorial 04b).  
-> ℹ️ **Ubuntu 26.04 (resolute):** use o pacote `zabbix-release` oficial — não adicione o repo manualmente (causa conflito de dependências com libs `t64`).
+> ℹ️ **Ubuntu 26.04 (resolute):** o pacote `zabbix-release` para ubuntu26.04 aponta para `noble` por padrão — é necessário corrigir o sources.list para `resolute` após a instalação.
 
 ```bash
 # Remover repositório antigo (se existir)
 rm -f /etc/apt/sources.list.d/zabbix.list
 rm -f /usr/share/keyrings/zabbix-archive-keyring.gpg
 
-# Instalar pacote de release oficial do Zabbix para Ubuntu 26.04
+# Instalar pacote de release oficial do Zabbix para Ubuntu 26.04 (instala a chave GPG)
 wget https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu26.04_all.deb
 dpkg -i zabbix-release_latest+ubuntu26.04_all.deb
+
+# Corrigir sources.list: trocar 'noble' por 'resolute' (repo nativo do Ubuntu 26.04)
+sed -i 's/noble/resolute/g' /etc/apt/sources.list.d/zabbix.list
+
+# Verificar
+grep resolute /etc/apt/sources.list.d/zabbix.list
 
 apt-get update
 
