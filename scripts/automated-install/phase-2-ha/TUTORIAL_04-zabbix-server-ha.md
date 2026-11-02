@@ -150,16 +150,12 @@ EOF
 
 ## ETAPA 6 — Importar schema do banco (somente no NODE 1)
 
-```bash
-# Criar usuário e conceder permissões no PostgreSQL
-PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix << 'EOF'
--- Verificar se schema já existe
-SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';
-EOF
+> ⚠️ **Importante:** use a linha única abaixo — sem `\` de continuação.  
+> O `PGPASSWORD` deve ficar antes do `zcat`, não do `psql`.
 
+```bash
 # Importar schema (somente node1, na primeira instalação)
-zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | \
-    PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix
+PGPASSWORD="TROQUEPELASENHADOBANCO" zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | psql -h 10.31.38.64 -U zabbix -d zabbix
 ```
 
 > ⚠️ **Node 2:** pule a importação do schema — o banco já foi populado pelo node1
