@@ -90,12 +90,19 @@ cp /etc/zabbix/zabbix_server.conf /etc/zabbix/zabbix_server.conf.backup
 
 ### 4.2 — Configurar banco de dados
 
+> ⚠️ No `zabbix_server.conf` as opções `DBHost` e `DBPassword` ficam **comentadas** por padrão.  
+> Use o padrão `# DBHost=` no sed (com `#` e espaço).
+
 ```bash
 # Definir conexão com PostgreSQL Primary
-sed -i "s/^DBHost=.*/DBHost=10.31.38.64/" /etc/zabbix/zabbix_server.conf
+# DBHost e DBPassword são comentadas no arquivo padrão — usar padrão com #
+sed -i "s/^# DBHost=.*/DBHost=10.31.38.64/" /etc/zabbix/zabbix_server.conf
 sed -i "s/^DBName=.*/DBName=zabbix/" /etc/zabbix/zabbix_server.conf
 sed -i "s/^DBUser=.*/DBUser=zabbix/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^DBPassword=.*/DBPassword=TROQUEPELASENHADOBANCO/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^# DBPassword=.*/DBPassword=TROQUEPELASENHADOBANCO/" /etc/zabbix/zabbix_server.conf
+
+# Confirmar (todas devem aparecer sem #)
+grep -n "^DBHost\|^DBName\|^DBUser\|^DBPassword" /etc/zabbix/zabbix_server.conf
 ```
 
 ### 4.3 — Configurar HA (node1 ou node2)
