@@ -196,6 +196,11 @@ tail -50 /var/log/zabbix/zabbix_server.log
 ## ETAPA 8 — Configurar sincronização entre nodes (SSH)
 
 ```bash
+# Criar diretório .ssh para o usuário zabbix (não existe por padrão)
+mkdir -p /home/zabbix/.ssh
+chown zabbix:zabbix /home/zabbix/.ssh
+chmod 700 /home/zabbix/.ssh
+
 # Criar par de chaves para o usuário zabbix
 sudo -u zabbix ssh-keygen -t rsa -b 4096 -f /home/zabbix/.ssh/id_rsa -N ""
 
