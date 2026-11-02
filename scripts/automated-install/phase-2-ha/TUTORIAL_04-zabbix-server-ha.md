@@ -17,8 +17,8 @@
 ## 🔧 Variáveis — defina antes de executar
 
 ```bash
-export DB_PASS="SUA_SENHA_ZABBIX_DB"        # Senha do banco zabbix
-export ZABBIX_API_PASS="SUA_SENHA_API"      # Senha da API Zabbix (padrão: zabbix)
+export DB_PASS="TROQUEPELASENHADOBANCO"         # Senha do banco zabbix
+export ZABBIX_API_PASS="TROQUEPELASENHADOBANCO" # Senha da API Zabbix (padrão: zabbix)
 ```
 
 ---
@@ -95,7 +95,7 @@ cp /etc/zabbix/zabbix_server.conf /etc/zabbix/zabbix_server.conf.backup
 sed -i "s/^DBHost=.*/DBHost=10.31.38.64/" /etc/zabbix/zabbix_server.conf
 sed -i "s/^DBName=.*/DBName=zabbix/" /etc/zabbix/zabbix_server.conf
 sed -i "s/^DBUser=.*/DBUser=zabbix/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^DBPassword=.*/DBPassword=${DB_PASS:-zabbix123}/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^DBPassword=.*/DBPassword=TROQUEPELASENHADOBANCO/" /etc/zabbix/zabbix_server.conf
 ```
 
 ### 4.3 — Configurar HA (node1 ou node2)
@@ -137,7 +137,7 @@ ssh administrator@10.31.38.64
 
 sudo -u postgres psql << EOF
 CREATE DATABASE zabbix;
-CREATE USER zabbix WITH ENCRYPTED PASSWORD 'zabbix123';
+CREATE USER zabbix WITH ENCRYPTED PASSWORD 'TROQUEPELASENHADOBANCO';
 GRANT ALL PRIVILEGES ON DATABASE zabbix TO zabbix;
 \c zabbix
 GRANT USAGE  ON SCHEMA public TO zabbix;
@@ -152,20 +152,21 @@ EOF
 
 ```bash
 # Criar usuário e conceder permissões no PostgreSQL
-PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix << 'EOF'
+PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix << 'EOF'
 -- Verificar se schema já existe
 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';
 EOF
 
 # Importar schema (somente node1, na primeira instalação)
-zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz |     PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix
+zcat /usr/share/zabbix-sql-scripts/postgresql/server.sql.gz | \
+    PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix
 ```
 
 > ⚠️ **Node 2:** pule a importação do schema — o banco já foi populado pelo node1
 
 ✅ **Verificação:**
 ```bash
-PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix -c "\dt" | head -20
+PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix -c "\dt" | head -20
 ```
 
 ---
@@ -213,7 +214,7 @@ systemctl status zabbix-server
 systemctl status zabbix-agent2
 
 # Teste de conectividade com banco
-PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix -c "SELECT COUNT(*) FROM hosts;"
+PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix -c "SELECT COUNT(*) FROM hosts;"
 
 # Verificar porta do Zabbix Server
 ss -tlnp | grep 10051
@@ -236,7 +237,7 @@ ss -tlnp | grep 10051
 tail -f /var/log/zabbix/zabbix_server.log
 
 # Status HA dos nodes Zabbix (via banco)
-PGPASSWORD="${DB_PASS:-zabbix123}" psql -h 10.31.38.64 -U zabbix -d zabbix \
+PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix \
     -c "SELECT name, address, status, lastaccess FROM ha_node;"
 
 ---
