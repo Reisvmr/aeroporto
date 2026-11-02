@@ -17,8 +17,11 @@
 # Configura:
 #   - HAProxy 2.x (Load Balancing)
 #   - Keepalived (VRRP Failover)
-#   - VIP flutuante: 10.31.38.72  (flutua entre vip-01=10.31.38.70 e vip-02=10.31.38.71)
-#   - 3 backends pre-configurados: Zabbix, Grafana, AWX (disabled até semanas 3-5)
+#   - 3 VIPs gerenciados pelo Keepalived (VRRP):
+#       VIP-Zabbix-Web : 10.31.38.72 (acesso ao Zabbix Frontend)
+#       VIP-Grafana    : 10.31.38.73 (acesso ao Grafana)
+#       VIP-AWX        : 10.31.38.74 (acesso ao AWX)
+#   - 3 backends pre-configurados (disabled até semanas 3b/4/5)
 #
 ################################################################################
 
@@ -56,21 +59,31 @@ NC='\033[0m'
 ROLE="${1:-}"  # master ou backup
 INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
 
-# IPs VIP
-VIP_IP="10.31.38.72"       # VIP flutuante (Keepalived virtual_ipaddress)
-VIP_MASTER="10.31.38.70"   # vip-01 — IP estático (gerenciamento)
-VIP_BACKUP="10.31.38.71"   # vip-02 — IP estático (gerenciamento)
+# IPs gerenciamento (estáticos)
+VIP_MASTER="10.31.38.70"   # vip-01 — MASTER
+VIP_BACKUP="10.31.38.71"   # vip-02 — BACKUP
 
-# Backends
-ZABBIX_01="10.31.38.60:80"
-ZABBIX_02="10.31.38.61:80"
+# 3 VIPs de serviço (gerenciados pelo Keepalived)
+VIP_ZABBIX="10.31.38.72"   # VIP acesso Zabbix Frontend
+VIP_GRAFANA="10.31.38.73"  # VIP acesso Grafana
+VIP_AWX="10.31.38.74"      # VIP acesso AWX
+
+# Backends — Zabbix Frontend (zbx-fe-01/02)
+ZBX_FE_01="10.31.38.62:80"
+ZBX_FE_02="10.31.38.63:80"
+
+# Backends — Grafana
 GRAFANA_01="10.31.38.66:3000"
 GRAFANA_02="10.31.38.67:3000"
+
+# Backends — AWX
 AWX_01="10.31.38.68:8080"
 AWX_02="10.31.38.69:8080"
 
 # Keepalived VRRP
-ROUTER_ID=50
+ROUTER_ID_ZABBIX=51
+ROUTER_ID_GRAFANA=52
+ROUTER_ID_AWX=53
 PRIORITY_MASTER=100
 PRIORITY_BACKUP=99
 ADVERT_INT=1
@@ -89,7 +102,7 @@ print_header() {
     echo "║                                                                    ║"
     echo "║  ⚖️  INSTALAÇÃO VIP/HAPROXY/KEEPALIVED - PROJETO AEROPORTO (HA)     ║"
     echo "║                                                                    ║"
-    echo "║  VIP: 10.31.38.72 (Failover automático <5s)                       ║"
+    echo "║  VIPs: Zabbix=10.31.38.72 | Grafana=10.31.38.73 | AWX=10.31.38.74  ║"
     echo "║  Role: $ROLE"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
@@ -155,7 +168,7 @@ instalar_haproxy() {
     print_section "INSTALAÇÃO HAPROXY"
     
     print_info "Instalando HAProxy..."
-    apt-get install -y haproxy 2>&1 | tee -a "$LOG_FILE"
+    apt-get install -y haproxy socat 2>&1 | tee -a "$LOG_FILE"
     
     print_ok "HAProxy instalado"
 }
@@ -176,118 +189,95 @@ configurar_haproxy() {
     cp /etc/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg.backup
     
     # Criar nova configuração
-    cat > /etc/haproxy/haproxy.cfg << 'HAPROXY_EOF'
+    # sysctl: permitir bind em IPs ainda não atribuídos à interface (VIPs Keepalived)
+    grep -q 'ip_nonlocal_bind' /etc/sysctl.conf || echo 'net.ipv4.ip_nonlocal_bind = 1' >> /etc/sysctl.conf
+    sysctl -p 2>&1 | grep -i nonlocal || true
+
+    cat > /etc/haproxy/haproxy.cfg << HAPROXY_EOF
 # ═══════════════════════════════════════════════════════════════════════════
 # HAProxy Configuration - Projeto Aeroporto HA
-# Data: 27/10/2026
+# VIPs: Zabbix=10.31.38.72 | Grafana=10.31.38.73 | AWX=10.31.38.74
+# Gerado pelo script 03-vip-haproxy-keepalived.sh
 # ═══════════════════════════════════════════════════════════════════════════
 
 global
-    log stdout local0
-    log stdout local1 notice
+    log /dev/log local0
+    log /dev/log local1 notice
     chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
     stats timeout 30s
     user haproxy
     group haproxy
     daemon
     maxconn 2048
-    tune.ssl.default-dh-param 2048
 
 defaults
-    log global
-    mode http
-    option httplog
-    option dontlognull
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    option  forwardfor except 127.0.0.0/8
+    option  http-server-close
     timeout connect 5000
-    timeout client 50000
-    timeout server 50000
-    option forwardfor except 127.0.0.0/8
-    option http-server-close
-    compression algo gzip
-    compression type text/html text/plain text/css text/xml text/javascript application/x-javascript application/json
+    timeout client  50000
+    timeout server  50000
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Frontend - VIP Global
+# Frontend Zabbix — VIP 10.31.38.72 porta 80
+# Backends: zbx-fe-01 (10.31.38.62) + zbx-fe-02 (10.31.38.63)
 # ═══════════════════════════════════════════════════════════════════════════
+frontend zabbix_front
+    bind ${VIP_ZABBIX}:80
+    default_backend backend_zabbix_frontend
 
-frontend frontend_global
-    bind *:80
-    bind *:443 ssl crt /etc/ssl/certs/haproxy.pem
-    option httpclose
-    
-    # Logs
-    log 127.0.0.1 local0 info
-    option forwardfor
-    
-    # ACLs para roteamento
-    acl is_zabbix hdr(host) -i zabbix.aeroporto
-    acl is_grafana hdr(host) -i grafana.aeroporto
-    acl is_awx hdr(host) -i awx.aeroporto
-    
-    # Roteamento por URI
-    acl is_zabbix_uri path_beg /zabbix
-    acl is_grafana_uri path_beg /grafana
-    acl is_awx_uri path_beg /awx
-    
-    # Default é health check
-    default_backend backend_health
-
-    # Zabbix
-    use_backend backend_zabbix if is_zabbix OR is_zabbix_uri
-    
-    # Grafana
-    use_backend backend_grafana if is_grafana OR is_grafana_uri
-    
-    # AWX
-    use_backend backend_awx if is_awx OR is_awx_uri
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Backends
-# ═══════════════════════════════════════════════════════════════════════════
-
-backend backend_health
-    mode http
-    balance roundrobin
-    option httpchk GET /
-    server local 127.0.0.1:8081 check inter 5s fall 3 rise 2
-
-backend backend_zabbix
-    mode http
+backend backend_zabbix_frontend
     balance roundrobin
     option httpchk GET /zabbix/
-    option http-keep-alive
-    # DISABLED — habilitado na Semana 3 pelo script 04-zabbix-server-ha.sh
-    server zabbix_01 10.31.38.60:80 disabled
-    server zabbix_02 10.31.38.61:80 disabled
+    # DISABLED — ativado pelo script 04b-zabbix-frontend-ha.sh (Semana 3b)
+    server zbx_fe_01 ${ZBX_FE_01} disabled
+    server zbx_fe_02 ${ZBX_FE_02} disabled
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Frontend Grafana — VIP 10.31.38.73 porta 3000
+# Backends: grafana-01 (10.31.38.66) + grafana-02 (10.31.38.67)
+# ═══════════════════════════════════════════════════════════════════════════
+frontend grafana_front
+    bind ${VIP_GRAFANA}:3000
+    default_backend backend_grafana
 
 backend backend_grafana
-    mode http
     balance roundrobin
     option httpchk GET /api/health
-    # DISABLED — habilitado na Semana 4 pelo script 05-grafana-ha.sh
-    server grafana_01 10.31.38.66:3000 disabled
-    server grafana_02 10.31.38.67:3000 disabled
+    # DISABLED — ativado pelo script 05-grafana-ha.sh (Semana 4)
+    server grafana_01 ${GRAFANA_01} disabled
+    server grafana_02 ${GRAFANA_02} disabled
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Frontend AWX — VIP 10.31.38.74 porta 8080
+# Backends: awx-01 (10.31.38.68) + awx-02 (10.31.38.69)
+# ═══════════════════════════════════════════════════════════════════════════
+frontend awx_front
+    bind ${VIP_AWX}:8080
+    default_backend backend_awx
 
 backend backend_awx
-    mode http
     balance roundrobin
-    option httpchk GET /api/v2/
-    # DISABLED — habilitado na Semana 5 pelo script 06-awx-ha.sh
-    server awx_01 10.31.38.68:8080 disabled
-    server awx_02 10.31.38.69:8080 disabled
+    option httpchk GET /api/v2/ping/
+    # DISABLED — ativado pelo script 06-awx-ha.sh (Semana 5)
+    server awx_01 ${AWX_01} disabled
+    server awx_02 ${AWX_02} disabled
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Statistics
+# Stats — porta 8404 (local)
 # ═══════════════════════════════════════════════════════════════════════════
-
 listen stats
-    bind 127.0.0.1:8081
+    bind *:8404
     stats enable
     stats uri /stats
     stats refresh 30s
     stats show-legends
     stats show-node
+    stats auth admin:haproxy@stats
     stats admin if TRUE
 
 HAPROXY_EOF
@@ -319,10 +309,20 @@ configurar_keepalived() {
         STATE="BACKUP"
     fi
     
+    # Determinar src_ip e peer
+    if [[ "$ROLE" == "master" ]]; then
+        SRC_IP="$VIP_MASTER"
+        PEER_IP="$VIP_BACKUP"
+    else
+        SRC_IP="$VIP_BACKUP"
+        PEER_IP="$VIP_MASTER"
+    fi
+
     cat > /etc/keepalived/keepalived.conf << KEEPALIVED_EOF
 # ═══════════════════════════════════════════════════════════════════════════
 # Keepalived Configuration - Projeto Aeroporto HA
-# Data: 27/10/2026
+# 3 instâncias VRRP: Zabbix (.72) | Grafana (.73) | AWX (.74)
+# Gerado pelo script 03-vip-haproxy-keepalived.sh
 # ═══════════════════════════════════════════════════════════════════════════
 
 global_defs {
@@ -338,7 +338,7 @@ global_defs {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
-# VRRP Instances
+# Script de health check
 # ═══════════════════════════════════════════════════════════════════════════
 
 vrrp_script check_haproxy {
@@ -349,30 +349,93 @@ vrrp_script check_haproxy {
     rise 2
 }
 
-vrrp_instance VI_1 {
+# ═══════════════════════════════════════════════════════════════════════════
+# VI_ZABBIX — VIP 10.31.38.72 (acesso ao Zabbix Frontend)
+# ═══════════════════════════════════════════════════════════════════════════
+
+vrrp_instance VI_ZABBIX {
     state $STATE
     interface $INTERFACE
-    virtual_router_id $ROUTER_ID
+    virtual_router_id $ROUTER_ID_ZABBIX
     priority $PRIORITY
     advert_int $ADVERT_INT
-    unicast_src_ip $([ "$ROLE" = "master" ] && echo "$VIP_MASTER" || echo "$VIP_BACKUP")
+    unicast_src_ip $SRC_IP
     unicast_peer {
-        $([ "$ROLE" = "master" ] && echo "$VIP_BACKUP" || echo "$VIP_MASTER")
+        $PEER_IP
     }
     authentication {
         auth_type PASS
         auth_pass aeroporto_ha
     }
     virtual_ipaddress {
-        $VIP_IP/24
+        $VIP_ZABBIX/25
     }
     track_script {
         check_haproxy
     }
     notify_master "/etc/keepalived/notify_master.sh"
     notify_backup "/etc/keepalived/notify_backup.sh"
-    notify_fault "/etc/keepalived/notify_fault.sh"
+    notify_fault  "/etc/keepalived/notify_fault.sh"
 }
+
+# ═══════════════════════════════════════════════════════════════════════════
+# VI_GRAFANA — VIP 10.31.38.73 (acesso ao Grafana)
+# ═══════════════════════════════════════════════════════════════════════════
+
+vrrp_instance VI_GRAFANA {
+    state $STATE
+    interface $INTERFACE
+    virtual_router_id $ROUTER_ID_GRAFANA
+    priority $PRIORITY
+    advert_int $ADVERT_INT
+    unicast_src_ip $SRC_IP
+    unicast_peer {
+        $PEER_IP
+    }
+    authentication {
+        auth_type PASS
+        auth_pass aeroporto_ha
+    }
+    virtual_ipaddress {
+        $VIP_GRAFANA/25
+    }
+    track_script {
+        check_haproxy
+    }
+    notify_master "/etc/keepalived/notify_master.sh"
+    notify_backup "/etc/keepalived/notify_backup.sh"
+    notify_fault  "/etc/keepalived/notify_fault.sh"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════
+# VI_AWX — VIP 10.31.38.74 (acesso ao AWX)
+# ═══════════════════════════════════════════════════════════════════════════
+
+vrrp_instance VI_AWX {
+    state $STATE
+    interface $INTERFACE
+    virtual_router_id $ROUTER_ID_AWX
+    priority $PRIORITY
+    advert_int $ADVERT_INT
+    unicast_src_ip $SRC_IP
+    unicast_peer {
+        $PEER_IP
+    }
+    authentication {
+        auth_type PASS
+        auth_pass aeroporto_ha
+    }
+    virtual_ipaddress {
+        $VIP_AWX/25
+    }
+    track_script {
+        check_haproxy
+    }
+    notify_master "/etc/keepalived/notify_master.sh"
+    notify_backup "/etc/keepalived/notify_backup.sh"
+    notify_fault  "/etc/keepalived/notify_fault.sh"
+}
+
 KEEPALIVED_EOF
     
     # Script de verificação HAProxy
@@ -426,6 +489,10 @@ configurar_firewall() {
         # VRRP
         ufw allow 112 comment "VRRP" 2>&1 | tee -a "$LOG_FILE"
         
+        ufw allow 3000/tcp comment "HAProxy -> Grafana" 2>&1 | tee -a "$LOG_FILE"
+        ufw allow 8080/tcp comment "HAProxy -> AWX" 2>&1 | tee -a "$LOG_FILE"
+        ufw allow 8404/tcp comment "HAProxy Stats" 2>&1 | tee -a "$LOG_FILE"
+
         # Health checks (todos os backends)
         ufw allow from 10.31.38.0/24 2>&1 | tee -a "$LOG_FILE"
         
@@ -434,24 +501,28 @@ configurar_firewall() {
 }
 
 testar_vip() {
-    print_section "TESTE DO VIP"
-    
+    print_section "TESTE DOS VIPs"
+
     sleep 3
-    
-    print_info "Verificando IP Virtual..."
-    if ip addr | grep -q "$VIP_IP"; then
-        print_ok "VIP ativo: $VIP_IP"
-    else
-        if [[ "$ROLE" == "master" ]]; then
-            print_erro "VIP não ativo em $ROLE"
+
+    print_info "Verificando VIPs Keepalived..."
+    for vip_label in "VIP-Zabbix:${VIP_ZABBIX}" "VIP-Grafana:${VIP_GRAFANA}" "VIP-AWX:${VIP_AWX}"; do
+        label="${vip_label%%:*}"
+        ip="${vip_label##*:}"
+        if ip addr | grep -q "${ip}"; then
+            print_ok "${label} ativo: ${ip}"
         else
-            print_info "VIP não ativo em backup (esperado)"
+            if [[ "$ROLE" == "master" ]]; then
+                print_info "${label} (${ip}) não detectado ainda em MASTER — aguardar Keepalived convergir"
+            else
+                print_info "${label} (${ip}) não ativo em BACKUP (esperado)"
+            fi
         fi
-    fi
-    
+    done
+
     print_info "Status HAProxy:"
     systemctl status haproxy --no-pager | head -5 | tee -a "$LOG_FILE"
-    
+
     print_info "Status Keepalived:"
     systemctl status keepalived --no-pager | head -5 | tee -a "$LOG_FILE"
 }
@@ -466,21 +537,23 @@ gerar_relatorio() {
     echo "" | tee -a "$LOG_FILE"
     
     echo "📊 RESUMO:" | tee -a "$LOG_FILE"
-    echo "  VIP: $VIP_IP" | tee -a "$LOG_FILE"
+    echo "  VIP Zabbix : $VIP_ZABBIX" | tee -a "$LOG_FILE"
+    echo "  VIP Grafana: $VIP_GRAFANA" | tee -a "$LOG_FILE"
+    echo "  VIP AWX    : $VIP_AWX" | tee -a "$LOG_FILE"
     echo "  Role: $ROLE" | tee -a "$LOG_FILE"
     echo "  Interface: $INTERFACE" | tee -a "$LOG_FILE"
     echo "  Status: ✓ Ativo" | tee -a "$LOG_FILE"
     echo "" | tee -a "$LOG_FILE"
     
     echo "🎯 BACKENDS CONFIGURADOS:" | tee -a "$LOG_FILE"
-    echo "  Zabbix:  $ZABBIX_01 + $ZABBIX_02" | tee -a "$LOG_FILE"
+    echo "  Zabbix Frontend: $ZBX_FE_01 + $ZBX_FE_02" | tee -a "$LOG_FILE"
     echo "  Grafana: $GRAFANA_01 + $GRAFANA_02" | tee -a "$LOG_FILE"
     echo "  AWX:     $AWX_01 + $AWX_02" | tee -a "$LOG_FILE"
     echo "" | tee -a "$LOG_FILE"
     
     echo "📝 COMANDOS ÚTEIS:" | tee -a "$LOG_FILE"
     echo "  Status: systemctl status haproxy keepalived" | tee -a "$LOG_FILE"
-    echo "  HAProxy stats: curl http://localhost:8081/stats" | tee -a "$LOG_FILE"
+    echo "  HAProxy stats: curl -u admin:haproxy@stats http://localhost:8404/stats" | tee -a "$LOG_FILE"
     echo "  Logs: tail -f /var/log/keepalived_notify.log" | tee -a "$LOG_FILE"
     echo "" | tee -a "$LOG_FILE"
 }

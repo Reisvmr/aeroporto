@@ -16,7 +16,7 @@
 #
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
-#   - VIP flutuante 10.31.38.72 já configurado (HAProxy+Keepalived em vip-01/vip-02)
+#   - VIP-Grafana 10.31.38.73 já configurado (HAProxy+Keepalived em vip-01/vip-02)
 #   - IPs estáticos: 10.31.38.66 (node1) / 10.31.38.67 (node2)
 #
 # Configura:
@@ -79,10 +79,10 @@ DB_PASS="${DB_PASS:-grafana123}"
 # IPs Grafana
 GRAFANA_NODE1="10.31.38.66"
 GRAFANA_NODE2="10.31.38.67"
-GRAFANA_VIP="10.31.38.72"
+GRAFANA_VIP="10.31.38.73"   # VIP-Grafana (acesso cliente)
 
 # Zabbix (Data Source)
-ZABBIX_URL="http://10.31.38.72"  # Via VIP
+ZABBIX_URL="http://10.31.38.72"  # VIP-Zabbix-Web (acesso ao Zabbix Frontend)
 ZABBIX_API_URL="$ZABBIX_URL/api_jsonrpc.php"
 ZABBIX_API_USER="Admin"
 ZABBIX_API_PASS="${ZABBIX_API_PASS:-zabbix}"
@@ -104,7 +104,7 @@ print_header() {
     echo "║  Node Type: $NODE_TYPE"
     echo "║  Cluster: grafana-01 + grafana-02                                 ║"
     echo "║  Database: PostgreSQL HA (10.31.38.64)                           ║"
-    echo "║  VIP: 10.31.38.72 (flutuante / HAProxy em vip-01/vip-02)          ║"
+    echo "║  VIP-Grafana: 10.31.38.73  (HAProxy em vip-01/vip-02)               ║"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -406,7 +406,7 @@ ativar_backend_haproxy() {
         echo "  sed -i 's/grafana_01 10.31.38.66:3000 disabled/grafana_01 10.31.38.66:3000 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
         echo "  sed -i 's/grafana_02 10.31.38.67:3000 disabled/grafana_02 10.31.38.67:3000 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
         echo "  systemctl reload haproxy"
-        echo "  # Stats: http://10.31.38.70:8404/stats"
+        echo "  # Stats: http://10.31.38.70:8404/stats  (ou http://10.31.38.71:8404/stats)"
     fi
 }
 

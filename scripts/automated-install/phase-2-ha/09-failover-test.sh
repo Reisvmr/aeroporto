@@ -180,7 +180,10 @@ test_vip_failover() {
     echo "  1. SSH em vip-01: ssh root@10.31.38.70"
     echo "  2. Parar Keepalived: systemctl stop keepalived"
     echo "  3. Aguardar 1-3 segundos (VRRP timeout)"
-    echo "  4. VIP Flutuante (10.31.38.72) migra de vip-01→vip-02"
+    echo "  4. VIPs migram de vip-01→vip-02:"
+    echo "     - VIP-Zabbix-Web (10.31.38.72)"
+    echo "     - VIP-Grafana    (10.31.38.73)"
+    echo "     - VIP-AWX        (10.31.38.74)"
     echo "  5. Todos os serviços continuam acessíveis via VIP"
     echo ""
     

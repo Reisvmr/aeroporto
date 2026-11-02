@@ -73,12 +73,16 @@ declare -A SERVERS=(
     [postgresql_standby]="10.31.38.65:5432"
     [zabbix_server_01]="10.31.38.60:10051"
     [zabbix_server_02]="10.31.38.61:10051"
+    [zbx_fe_01]="10.31.38.62:80"
+    [zbx_fe_02]="10.31.38.63:80"
     [grafana_01]="10.31.38.66:3000"
     [grafana_02]="10.31.38.67:3000"
     [awx_01]="10.31.38.68:8080"
     [awx_02]="10.31.38.69:8080"
-    [vip_floating]="10.31.38.72:80"
-    [vip_master]="10.31.38.70:8081"
+    [vip_zabbix]="10.31.38.72:80"
+    [vip_grafana]="10.31.38.73:3000"
+    [vip_awx]="10.31.38.74:8080"
+    [vip_master]="10.31.38.70:8404"
 )
 
 # Contadores
@@ -291,15 +295,19 @@ validate_awx() {
 }
 
 validate_vip() {
-    print_section "VALIDAÇÃO VIP / LOAD BALANCER"
-    
-    # Master
-    print_info "Testando VIP Flutuante (10.31.38.72)..."
-    validate_server "VIP Flutuante" "10.31.38.72" "80"
-    
-    # Backup
-    print_info "Testando HAProxy vip-01 stats (10.31.38.70)..."
-    validate_server "HAProxy vip-01 stats" "10.31.38.70" "8081"
+    print_section "VALIDAÇÃO VIPs / LOAD BALANCER"
+
+    print_info "Testando VIP-Zabbix-Web (10.31.38.72:80)..."
+    validate_server "VIP-Zabbix-Web" "10.31.38.72" "80"
+
+    print_info "Testando VIP-Grafana (10.31.38.73:3000)..."
+    validate_server "VIP-Grafana" "10.31.38.73" "3000"
+
+    print_info "Testando VIP-AWX (10.31.38.74:8080)..."
+    validate_server "VIP-AWX" "10.31.38.74" "8080"
+
+    print_info "Testando HAProxy Stats vip-01 (10.31.38.70:8404)..."
+    validate_server "HAProxy Stats vip-01" "10.31.38.70" "8404"
 }
 
 validate_logs() {

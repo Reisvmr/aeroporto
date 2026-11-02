@@ -263,7 +263,7 @@ echo "Login: admin / ${AWX_ADMIN_PASS:-admin123}"
 
 ## 📝 Próximos passos
 
-1. Acesse: `http://10.31.38.72/awx` (via VIP)  
+1. Acesse: `http://10.31.38.74:8080` (via VIP-AWX)  
 2. Configure credenciais e inventários  
 3. Instale node2 (repita no awx-02 com `node2`)  
 
@@ -320,7 +320,7 @@ echo 'show servers state backend_awx' | socat /run/haproxy/admin.sock stdio
 curl -s 'http://10.31.38.70:8404/stats' | grep -i awx
 
 # Acesso via VIP flutuante
-curl -sk http://10.31.38.72:8080/api/v2/ping/ -w "HTTP: %{http_code}\n"
+curl -sk http://10.31.38.74:8080/api/v2/ping/ -w "HTTP: %{http_code}\n"
 ```
 
 > ✅ Backends devem aparecer como **UP** nas stats: `http://10.31.38.70:8404/stats`

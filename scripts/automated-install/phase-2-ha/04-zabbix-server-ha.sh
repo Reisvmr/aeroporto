@@ -17,7 +17,9 @@
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
 #   - IPs estáticos: 10.31.38.60 (node1) / 10.31.38.61 (node2)
-#   - VIP flutuante 10.31.38.72 já configurado (HAProxy+Keepalived em vip-01/vip-02)
+#   - VIP-Zabbix-Web 10.31.38.72 já configurado (HAProxy+Keepalived em vip-01/vip-02)
+#   - zbx-fe-01 (10.31.38.62) e zbx-fe-02 (10.31.38.63) hospedam o Zabbix Frontend
+#   - Script 04b-zabbix-frontend-ha.sh instala o Frontend nos servidores zbx-fe-01/02
 #
 # Configura:
 #   - Zabbix Server 7.0 LTS
@@ -79,7 +81,7 @@ DB_PASS="${DB_PASS:-zabbix123}"
 # IPs Zabbix
 ZABBIX_NODE1="10.31.38.60"
 ZABBIX_NODE2="10.31.38.61"
-ZABBIX_VIP="10.31.38.72"
+ZABBIX_VIP="10.31.38.72"   # VIP-Zabbix-Web (acesso cliente ao Frontend)
 
 # Sincronização
 RSYNC_USER="zabbix"
@@ -102,7 +104,7 @@ print_header() {
     echo "║  Node Type: $NODE_TYPE"
     echo "║  Cluster: zbx-server-01 + zbx-server-02                           ║"
     echo "║  Database: PostgreSQL HA (10.31.38.64/65)                        ║"
-    echo "║  VIP: 10.31.38.72 (flutuante / HAProxy em vip-01/vip-02)          ║"
+    echo "║  VIP-Zabbix-Web: 10.31.38.72  |  zbx-fe-01/02: .62/.63             ║"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -439,19 +441,20 @@ ativar_backend_haproxy() {
     local VIPS=("10.31.38.70" "10.31.38.71")
     local ativados=0
 
-    print_info "Ativando backend Zabbix no HAProxy (vip-01 e vip-02)..."
+    print_info "Ativando backend Zabbix Frontend no HAProxy (vip-01 e vip-02)..."
+    print_info "  Nota: zbx-fe-01 (10.31.38.62) e zbx-fe-02 (10.31.38.63) devem estar instalados"
 
     for vip_ip in "${VIPS[@]}"; do
         if timeout 5 bash -c "</dev/tcp/${vip_ip}/22" 2>/dev/null; then
             print_info "  -> SSH em ${vip_ip}..."
             if ssh -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 root@"${vip_ip}" \
                 'socat_ok=0; command -v socat &>/dev/null && [ -S /run/haproxy/admin.sock ] && socat_ok=1
-                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_zabbix/zabbix_01" | socat /run/haproxy/admin.sock stdio
-                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_zabbix/zabbix_02" | socat /run/haproxy/admin.sock stdio
-                 sed -i "s|zabbix_01 10.31.38.60:80 disabled|zabbix_01 10.31.38.60:80 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
-                 sed -i "s|zabbix_02 10.31.38.61:80 disabled|zabbix_02 10.31.38.61:80 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
+                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_zabbix_frontend/zbx_fe_01" | socat /run/haproxy/admin.sock stdio
+                 [ "$socat_ok" -eq 1 ] && echo "enable server backend_zabbix_frontend/zbx_fe_02" | socat /run/haproxy/admin.sock stdio
+                 sed -i "s|zbx_fe_01 10.31.38.62:80 disabled|zbx_fe_01 10.31.38.62:80 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
+                 sed -i "s|zbx_fe_02 10.31.38.63:80 disabled|zbx_fe_02 10.31.38.63:80 check inter 5s fall 3 rise 2|" /etc/haproxy/haproxy.cfg
                  haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl reload haproxy'; then
-                print_ok "  v Backend Zabbix ativado em ${vip_ip}"
+                print_ok "  v Backend Zabbix Frontend ativado em ${vip_ip}"
                 ativados=$((ativados + 1))
             else
                 print_warning "  x Falha ao ativar em ${vip_ip}"
@@ -464,10 +467,10 @@ ativar_backend_haproxy() {
     if [ "$ativados" -lt 2 ]; then
         echo ""
         print_warning "Execute manualmente em CADA vip (vip-01 E vip-02):"
-        echo "  echo 'enable server backend_zabbix/zabbix_01' | socat /run/haproxy/admin.sock stdio"
-        echo "  echo 'enable server backend_zabbix/zabbix_02' | socat /run/haproxy/admin.sock stdio"
-        echo "  sed -i 's/zabbix_01 10.31.38.60:80 disabled/zabbix_01 10.31.38.60:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
-        echo "  sed -i 's/zabbix_02 10.31.38.61:80 disabled/zabbix_02 10.31.38.61:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
+        echo "  echo 'enable server backend_zabbix_frontend/zbx_fe_01' | socat /run/haproxy/admin.sock stdio"
+        echo "  echo 'enable server backend_zabbix_frontend/zbx_fe_02' | socat /run/haproxy/admin.sock stdio"
+        echo "  sed -i 's/zbx_fe_01 10.31.38.62:80 disabled/zbx_fe_01 10.31.38.62:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
+        echo "  sed -i 's/zbx_fe_02 10.31.38.63:80 disabled/zbx_fe_02 10.31.38.63:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg"
         echo "  systemctl reload haproxy"
         echo "  # Stats: http://10.31.38.70:8404/stats"
     fi

@@ -8,22 +8,27 @@
 
 ## 🖥️ Mapa de Servidores e IPs
 
-| Servidor       | IP             | Função                          | Semana |
-|----------------|----------------|---------------------------------|--------|
-| zbx-server-01  | 10.31.38.60    | Zabbix Server (Primary)         | 3      |
-| zbx-server-02  | 10.31.38.61    | Zabbix Server (Standby)         | 3      |
-| pg-01          | 10.31.38.64    | PostgreSQL Primary              | 1      |
-| pg-02          | 10.31.38.65    | PostgreSQL Standby              | 1      |
-| grafana-01     | 10.31.38.66    | Grafana (Primary)               | 4      |
-| grafana-02     | 10.31.38.67    | Grafana (Standby)               | 4      |
-| awx-01         | 10.31.38.68    | AWX (Primary)                   | 5      |
-| awx-02         | 10.31.38.69    | AWX (Standby)                   | 5      |
-| vip-01         | 10.31.38.70    | HAProxy + Keepalived (Master)   | 2      |
-| vip-02         | 10.31.38.71    | HAProxy + Keepalived (Backup)   | 2      |
-| **VIP**        | **10.31.38.72**| **VIP Flutuante (Keepalived)**  | 2      |
+| Servidor           | IP             | Função                             | Semana |
+|--------------------|----------------|------------------------------------|--------|
+| zbx-server-01      | 10.31.38.60    | Zabbix Server ativo                | 3      |
+| zbx-server-02      | 10.31.38.61    | Zabbix Server standby              | 3      |
+| **zbx-fe-01**      | **10.31.38.62**| **Zabbix Frontend ativo**          | **3b** |
+| **zbx-fe-02**      | **10.31.38.63**| **Zabbix Frontend standby**        | **3b** |
+| pg-01              | 10.31.38.64    | PostgreSQL Primary                 | 1      |
+| pg-02              | 10.31.38.65    | PostgreSQL Replica                 | 1      |
+| grafana-01         | 10.31.38.66    | Grafana ativo                      | 4      |
+| grafana-02         | 10.31.38.67    | Grafana standby                    | 4      |
+| awx-01             | 10.31.38.68    | AWX ativo                          | 5      |
+| awx-02             | 10.31.38.69    | AWX standby opcional               | 5      |
+| vip-01             | 10.31.38.70    | HAProxy + Keepalived Master        | 2      |
+| vip-02             | 10.31.38.71    | HAProxy + Keepalived Backup        | 2      |
+| **VIP-Zabbix-Web** | **10.31.38.72**| **VIP acesso Zabbix Frontend**     | **2**  |
+| **VIP-Grafana**    | **10.31.38.73**| **VIP acesso Grafana**             | **2**  |
+| **VIP-AWX**        | **10.31.38.74**| **VIP acesso AWX**                 | **2**  |
 
-> 📌 O IP `10.31.38.72` é o VIP flutuante — migra automaticamente entre vip-01 e vip-02 em caso de falha.  
-> Clientes e serviços acessam sempre via `10.31.38.72`, nunca diretamente pelos IPs estáticos das VIPs.
+> 📌 **3 VIPs de serviço**, todos gerenciados pelo Keepalived (VRRP), migram automaticamente entre vip-01 e vip-02 em caso de falha:  
+> `10.31.38.72` (Zabbix) · `10.31.38.73` (Grafana) · `10.31.38.74` (AWX)  
+> Clientes acessam sempre pelos VIPs, nunca diretamente pelos IPs dos servidores.
 
 ---
 
@@ -124,7 +129,8 @@
 - **Configura:**
   - HAProxy 2.x (Load Balancing)
   - Keepalived (VRRP Failover)
-  - VIP flutuante: 10.31.38.72 (flutua entre vip-01 e vip-02)
+  - VIP-Zabbix-Web: 10.31.38.72 | VIP-Grafana: 10.31.38.73 | VIP-AWX: 10.31.38.74
+  - Todos os VIPs migram entre vip-01 e vip-02 automaticamente (Keepalived VRRP)
   - 3 backends: Zabbix, Grafana, AWX
   - Health checks (5s interval)
   - Firewall (portas 80, 443)
@@ -133,7 +139,7 @@
 - **Validação pós-instalação:**
   ```bash
   # Verificar VIP ativo:
-  ip addr | grep 10.31.38.72  # VIP flutuante
+  ip addr | grep -E '10.31.38.7[234]'  # 3 VIPs de serviço
   
   # HAProxy stats:
   curl http://localhost:8081/stats
@@ -170,7 +176,7 @@ sudo ./00-prerequisitos-validacao.sh vip
 sudo ./03-vip-haproxy-keepalived.sh backup
 
 # Validação:
-curl http://10.31.38.72/stats
+curl -u admin:haproxy@stats http://10.31.38.70:8404/stats
 ```
 
 ### **SEMANA 3: Zabbix HA** (~4 horas)

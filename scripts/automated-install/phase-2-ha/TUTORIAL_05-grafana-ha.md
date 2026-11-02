@@ -132,7 +132,7 @@ echo "SECRET_KEY=$SECRET_KEY"
 
 ```bash
 sed -i "s/^;http_port = 3000/http_port = 3000/" /etc/grafana/grafana.ini
-sed -i "s|^;root_url = .*|root_url = http://10.31.38.72|" /etc/grafana/grafana.ini
+sed -i "s|^;root_url = .*|root_url = http://10.31.38.73|" /etc/grafana/grafana.ini
 ```
 
 ### 5.7 — Configurar logging
@@ -226,14 +226,14 @@ tail -30 /var/log/grafana/grafana.log
 # Acesso web (local)
 echo "Grafana local: http://$(hostname -I | awk '{print $1}'):3000"
 echo "Login: admin / admin (troque na primeira entrada!)"
-echo "Grafana via VIP: http://10.31.38.72"
+echo "Grafana via VIP: http://10.31.38.73"
 ```
 
 ---
 
 ## 📝 Próximos passos
 
-1. Acesse: `http://10.31.38.72` e troque a senha do admin  
+1. Acesse: `http://10.31.38.73` e troque a senha do admin  
 2. Instale node2 (repita os passos no grafana-02 com `node2`)  
 3. **⚠️ Use a mesma `secret_key` em ambos os nodes!**  
 4. Importe dashboards da comunidade Grafana  
@@ -290,7 +290,7 @@ echo 'show servers state backend_grafana' | socat /run/haproxy/admin.sock stdio
 curl -s 'http://10.31.38.70:8404/stats' | grep -i grafana
 
 # Acesso via VIP flutuante
-curl -sk http://10.31.38.72:3000/api/health -w "HTTP: %{http_code}\n"
+curl -sk http://10.31.38.73:3000/api/health -w "HTTP: %{http_code}\n"
 ```
 
 > ✅ Backends devem aparecer como **UP** nas stats: `http://10.31.38.70:8404/stats`

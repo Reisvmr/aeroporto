@@ -17,7 +17,7 @@
 # Pré-requisitos:
 #   - PostgreSQL HA (pg-01/pg-02) já instalado e rodando
 #   - Docker e Docker Compose instalados
-#   - VIP flutuante 10.31.38.72 já configurado (HAProxy+Keepalived em vip-01/vip-02)
+#   - VIP-AWX 10.31.38.74 já configurado (HAProxy+Keepalived em vip-01/vip-02)
 #   - IPs estáticos: 10.31.38.68 (node1) / 10.31.38.69 (node2)
 #
 # Configura:
@@ -77,7 +77,7 @@ DB_PASS="${DB_PASS:-awx123}"
 # IPs AWX
 AWX_NODE1="10.31.38.68"
 AWX_NODE2="10.31.38.69"
-AWX_VIP="10.31.38.72"
+AWX_VIP="10.31.38.74"   # VIP-AWX (acesso cliente)
 
 # Admin
 AWX_ADMIN_USER="admin"
@@ -100,7 +100,7 @@ print_header() {
     echo "║  Node Type: $NODE_TYPE"
     echo "║  Cluster: awx-01 + awx-02                                         ║"
     echo "║  Database: PostgreSQL HA (10.31.38.64)                           ║"
-    echo "║  VIP: 10.31.38.72 (flutuante / HAProxy em vip-01/vip-02)          ║"
+    echo "║  VIP-AWX: 10.31.38.74  (HAProxy em vip-01/vip-02)                  ║"
     echo "║                                                                    ║"
     echo "╚════════════════════════════════════════════════════════════════════╝"
     echo ""
