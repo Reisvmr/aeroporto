@@ -1,0 +1,232 @@
+# 📊 TUTORIAL 04c — Zabbix Server 7.0 · NODE 2 (zbx-server-02)
+
+> **Servidor:** zbx-server-02 — IP `10.31.38.61`  
+> **Objetivo:** Instalar e integrar o segundo nó Zabbix Server ao cluster HA  
+> **Pré-requisito:** TUTORIAL_04 (zbx-server-01) **totalmente concluído**
+
+---
+
+## 📋 Pré-requisitos
+
+- PostgreSQL HA (pg-01 `10.31.38.64`) rodando com banco `zabbix` já criado
+- zbx-server-01 (`10.31.38.60`) instalado, ativo e com HA funcionando
+- IP estático `10.31.38.61` já configurado neste servidor
+
+---
+
+## 🔧 Variável — defina antes de executar
+
+```bash
+export DB_PASS="TROQUEPELASENHADOBANCO"   # Mesma senha usada no node1
+```
+
+---
+
+## ETAPA 1 — Verificar pré-requisitos
+
+```bash
+# Confirmar IP do node
+hostname -I | awk '{print $1}'
+# Esperado: 10.31.38.61
+
+# Testar conectividade com PostgreSQL Primary
+timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01 acessível" || echo "✗ pg-01 INACESSÍVEL"
+
+# Testar conectividade com node1
+timeout 5 bash -c '</dev/tcp/10.31.38.60/10051' && echo "✓ zbx-server-01 acessível" || echo "✗ zbx-server-01 INACESSÍVEL"
+
+# Verificar espaço em /var (mínimo 20GB)
+df -BG /var | awk 'NR==2{print $4}'
+```
+
+---
+
+## ETAPA 2 — Atualizar sistema
+
+```bash
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+```
+
+---
+
+## ETAPA 3 — Instalar Zabbix Server 7.0
+
+> ℹ️ Mesmo procedimento do node1.  
+> ℹ️ **Ubuntu 26.04 (resolute):** corrigir sources.list de `noble` para `resolute` após instalação.
+
+```bash
+# Remover repositório antigo (se existir)
+rm -f /etc/apt/sources.list.d/zabbix.list
+rm -f /usr/share/keyrings/zabbix-archive-keyring.gpg
+
+# Instalar pacote de release oficial do Zabbix para Ubuntu 26.04
+wget https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu26.04_all.deb
+dpkg -i zabbix-release_latest+ubuntu26.04_all.deb
+
+# Corrigir sources.list: trocar 'noble' por 'resolute'
+sed -i 's/noble/resolute/g' /etc/apt/sources.list.d/zabbix.list
+
+# Verificar
+grep resolute /etc/apt/sources.list.d/zabbix.list
+
+apt-get update
+
+# Instalar Zabbix Server + Agent2 + sql-scripts
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    zabbix-server-pgsql \
+    zabbix-agent2 \
+    zabbix-sql-scripts
+```
+
+✅ **Verificação:** `zabbix_server --version`
+
+---
+
+## ETAPA 4 — Configurar Zabbix Server
+
+### 4.1 — Backup da configuração original
+
+```bash
+cp /etc/zabbix/zabbix_server.conf /etc/zabbix/zabbix_server.conf.backup
+```
+
+### 4.2 — Configurar banco de dados
+
+> ⚠️ No arquivo padrão, `DBHost` e `DBPassword` ficam **comentados** (`# DBHost=`).  
+> Os comandos abaixo já tratam esse padrão corretamente.
+
+```bash
+sed -i "s/^# DBHost=.*/DBHost=10.31.38.64/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^DBName=.*/DBName=zabbix/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^DBUser=.*/DBUser=zabbix/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^# DBPassword=.*/DBPassword=${DB_PASS:-TROQUEPELASENHADOBANCO}/" /etc/zabbix/zabbix_server.conf
+
+# Confirmar (todas devem aparecer sem #)
+grep -n "^DBHost\|^DBName\|^DBUser\|^DBPassword" /etc/zabbix/zabbix_server.conf
+```
+
+### 4.3 — Configurar HA (NodeID = 2)
+
+> ⚠️ Node2 usa `NodeID=2` — diferente do node1 que usa `NodeID=1`.
+
+```bash
+sed -i "s/^# NodeID=/NodeID=/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^NodeID=.*/NodeID=2/" /etc/zabbix/zabbix_server.conf
+```
+
+### 4.4 — Configurar performance
+
+```bash
+sed -i "s/^# CacheSize=.*/CacheSize=512M/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^# HistoryCacheSize=.*/HistoryCacheSize=256M/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^# ValueCacheSize=.*/ValueCacheSize=256M/" /etc/zabbix/zabbix_server.conf
+sed -i "s/^# WorkerProcesses=.*/WorkerProcesses=8/" /etc/zabbix/zabbix_server.conf
+```
+
+### 4.5 — Configurar logging
+
+```bash
+sed -i "s/^LogFile=.*/LogFile=\/var\/log\/zabbix\/zabbix_server.log/" /etc/zabbix/zabbix_server.conf
+```
+
+---
+
+## ETAPA 5 — Iniciar serviços
+
+> ⚠️ **NÃO importar schema aqui** — o banco já foi populado pelo node1.
+
+```bash
+systemctl enable zabbix-server zabbix-agent2
+systemctl restart zabbix-server zabbix-agent2
+
+# Aguardar e verificar logs
+sleep 10
+tail -30 /var/log/zabbix/zabbix_server.log
+```
+
+✅ **Esperado nos logs:** `started [ha manager]` e node2 como `standby` sem erros `Z3001`.
+
+---
+
+## ETAPA 6 — Troca de chaves SSH entre os nodes
+
+> ⚠️ O diretório `/home/zabbix/.ssh` não existe por padrão — crie antes do keygen.
+
+### 6.1 — Gerar chave no node2
+
+```bash
+mkdir -p /home/zabbix/.ssh
+chown zabbix:zabbix /home/zabbix/.ssh
+chmod 700 /home/zabbix/.ssh
+
+sudo -u zabbix ssh-keygen -t rsa -b 4096 -f /home/zabbix/.ssh/id_rsa -N ""
+```
+
+### 6.2 — Copiar chave do node2 → node1
+
+```bash
+# Especificar a chave com -i para evitar erro "No identities found"
+sudo -u zabbix ssh-copy-id -i /home/zabbix/.ssh/id_rsa.pub zabbix@10.31.38.60
+```
+
+### 6.3 — No node1: copiar chave do node1 → node2
+
+```bash
+# Execute este comando NO zbx-server-01 (10.31.38.60)
+sudo -u zabbix ssh-copy-id -i /home/zabbix/.ssh/id_rsa.pub zabbix@10.31.38.61
+```
+
+### 6.4 — Testar SSH entre nodes
+
+```bash
+# No node2: testar acesso ao node1
+sudo -u zabbix ssh zabbix@10.31.38.60 hostname
+
+# No node1: testar acesso ao node2
+# sudo -u zabbix ssh zabbix@10.31.38.61 hostname
+```
+
+---
+
+## ETAPA 7 — Verificação final do cluster HA
+
+```bash
+# Status dos serviços no node2
+systemctl status zabbix-server zabbix-agent2 --no-pager
+
+# Porta do Zabbix Server (10051)
+ss -tlnp | grep 10051
+
+# Status HA (node1=active, node2=standby)
+PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d zabbix \
+    -c "SELECT name, address, status, lastaccess FROM ha_node;"
+```
+
+✅ **Resultado esperado:**
+
+```
+     name      |   address     | status  |     lastaccess
+---------------+---------------+---------+--------------------
+ zbx-server-01 | 10.31.38.60   | active  | 2026-...
+ zbx-server-02 | 10.31.38.61   | standby | 2026-...
+```
+
+---
+
+## ✅ Checklist do cluster Zabbix HA
+
+| Item | node1 | node2 |
+|---|---|---|
+| `zabbix-server` | ✅ active (running) | ✅ active (running) |
+| `zabbix-agent2` | ✅ active (running) | ✅ active (running) |
+| Porta 10051 | ✅ ouvindo | ✅ ouvindo |
+| NodeID | ✅ 1 | ✅ 2 |
+| HA status | ✅ active | ✅ standby |
+| SSH entre nodes | ✅ | ✅ |
+
+---
+
+## 📌 Próximo passo
+
+➡️ **TUTORIAL_04d** — Ativar backends Zabbix no HAProxy (vip-01 / vip-02)
