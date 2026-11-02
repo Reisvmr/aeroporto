@@ -49,22 +49,17 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 ## ETAPA 3 — Instalar Zabbix Server 7.0
 
-> ⚠️ **Nota:** `apt-key` foi removido no Ubuntu 25.x. Use o método moderno abaixo.  
-> ⚠️ **Nota:** O Zabbix 7.0 não publica pacotes para `resolute` (25.10) — use `noble` (24.04 LTS), que é binariamente compatível.  
-> ℹ️ **Frontend não instalado aqui** — o Zabbix Frontend (Apache/PHP) vai nos servidores zbx-fe-01/02 (tutorial 04b).
+> ℹ️ **Frontend não instalado aqui** — o Zabbix Frontend (Apache/PHP) vai nos servidores zbx-fe-01/02 (tutorial 04b).  
+> ℹ️ **Ubuntu 26.04 (resolute):** use o pacote `zabbix-release` oficial — não adicione o repo manualmente (causa conflito de dependências com libs `t64`).
 
 ```bash
 # Remover repositório antigo (se existir)
 rm -f /etc/apt/sources.list.d/zabbix.list
+rm -f /usr/share/keyrings/zabbix-archive-keyring.gpg
 
-# Importar chave GPG (método moderno, sem apt-key)
-curl -fsSL https://repo.zabbix.com/zabbix-official-repo.key | \
-    gpg --dearmor -o /usr/share/keyrings/zabbix-archive-keyring.gpg
-
-# Adicionar repositório Zabbix 7.0 usando 'noble' (24.04 LTS)
-echo "deb [signed-by=/usr/share/keyrings/zabbix-archive-keyring.gpg] \
-https://repo.zabbix.com/zabbix/7.0/ubuntu noble main" \
-    > /etc/apt/sources.list.d/zabbix.list
+# Instalar pacote de release oficial do Zabbix para Ubuntu 26.04
+wget https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu26.04_all.deb
+dpkg -i zabbix-release_latest+ubuntu26.04_all.deb
 
 apt-get update
 
