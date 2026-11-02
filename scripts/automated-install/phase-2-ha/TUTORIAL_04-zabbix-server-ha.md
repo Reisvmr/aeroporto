@@ -49,18 +49,30 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 ## ETAPA 3 — Instalar Zabbix Server 7.0
 
-```bash
-# Adicionar chave do repositório
-wget -q https://repo.zabbix.com/zabbix-official-repo.key -O /tmp/zabbix-key
-apt-key add /tmp/zabbix-key
+> ⚠️ **Nota:** `apt-key` foi removido no Ubuntu 25.x. Use o método moderno abaixo.  
+> ⚠️ **Nota:** O Zabbix 7.0 não publica pacotes para `resolute` (25.10) — use `noble` (24.04 LTS), que é binariamente compatível.  
+> ℹ️ **Frontend não instalado aqui** — o Zabbix Frontend (Apache/PHP) vai nos servidores zbx-fe-01/02 (tutorial 04b).
 
-# Adicionar repositório Zabbix 7.0
-echo "deb https://repo.zabbix.com/zabbix/7.0/ubuntu $(lsb_release -cs) main" > /etc/apt/sources.list.d/zabbix.list
+```bash
+# Remover repositório antigo (se existir)
+rm -f /etc/apt/sources.list.d/zabbix.list
+
+# Importar chave GPG (método moderno, sem apt-key)
+curl -fsSL https://repo.zabbix.com/zabbix-official-repo.key | \
+    gpg --dearmor -o /usr/share/keyrings/zabbix-archive-keyring.gpg
+
+# Adicionar repositório Zabbix 7.0 usando 'noble' (24.04 LTS)
+echo "deb [signed-by=/usr/share/keyrings/zabbix-archive-keyring.gpg] \
+https://repo.zabbix.com/zabbix/7.0/ubuntu noble main" \
+    > /etc/apt/sources.list.d/zabbix.list
 
 apt-get update
 
-# Instalar Zabbix Server + Frontend + Agent2
-DEBIAN_FRONTEND=noninteractive apt-get install -y     zabbix-server-pgsql     zabbix-frontend-php-pgsql     zabbix-agent2     zabbix-sql-scripts
+# Instalar apenas Zabbix Server + Agent2 (sem frontend — vai no zbx-fe-01/02)
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    zabbix-server-pgsql \
+    zabbix-agent2 \
+    zabbix-sql-scripts
 ```
 
 ✅ **Verificação:** `zabbix_server --version`
