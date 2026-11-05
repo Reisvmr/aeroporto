@@ -1,15 +1,15 @@
 # ⚡ TUTORIAL 04f — Ativar Backends Zabbix Frontend no HAProxy
 
 > **Servidores:** vip-01 (`10.31.38.70`) e vip-02 (`10.31.38.71`)  
-> **Objetivo:** Ativar os backends do Zabbix Frontend no HAProxy após os dois nodes web estarem operacionais  
-> **Pré-requisito:** TUTORIAL_04b (zbx-fe-01) e TUTORIAL_04e (zbx-fe-02) **totalmente concluídos**
+> **Objetivo:** Ativar os backends do Zabbix Frontend no HAProxy após os dois nodes estarem operacionais  
+> **Pré-requisito:** TUTORIAL_04 (zbx-server-01) e TUTORIAL_04c (zbx-server-02) **totalmente concluídos**
 
 ---
 
 ## 📋 Pré-requisitos
 
-- zbx-fe-01 (`10.31.38.62`) respondendo na porta 80 — `curl http://10.31.38.62/zabbix/`
-- zbx-fe-02 (`10.31.38.63`) respondendo na porta 80 — `curl http://10.31.38.63/zabbix/`
+- zbx-server-01 (`10.31.38.60`) respondendo na porta 80 — `curl http://10.31.38.60/zabbix/`
+- zbx-server-02 (`10.31.38.61`) respondendo na porta 80 — `curl http://10.31.38.61/zabbix/`
 - HAProxy com backends `zbx_fe_01` e `zbx_fe_02` no estado `disabled` (configurado no TUTORIAL_03)
 
 ---
@@ -76,8 +76,8 @@ echo 'show servers state backend_zabbix_frontend' | socat /run/haproxy/admin.soc
 grep -n "zbx_fe_0" /etc/haproxy/haproxy.cfg
 
 # Remover 'disabled' e adicionar healthcheck nas duas entradas
-sed -i 's/server zbx_fe_01 10\.31\.38\.62:80 disabled/server zbx_fe_01 10.31.38.62:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
-sed -i 's/server zbx_fe_02 10\.31\.38\.63:80 disabled/server zbx_fe_02 10.31.38.63:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
+sed -i 's/server zbx_fe_01 10\.31\.38\.60:80 disabled/server zbx_fe_01 10.31.38.60:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
+sed -i 's/server zbx_fe_02 10\.31\.38\.61:80 disabled/server zbx_fe_02 10.31.38.61:80 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
 
 # Confirmar alteração
 grep -n "zbx_fe_0" /etc/haproxy/haproxy.cfg
@@ -162,9 +162,9 @@ journalctl -u haproxy -f
 # Status dos backends Frontend em loop
 watch -n 10 "echo 'show servers state backend_zabbix_frontend' | socat /run/haproxy/admin.sock stdio"
 
-# Logs Apache nos nodes frontend
-ssh administrator@10.31.38.62 'tail -f /var/log/apache2/access.log'
-ssh administrator@10.31.38.63 'tail -f /var/log/apache2/access.log'
+# Logs Apache nos nodes (agora nos próprios zbx-server)
+ssh administrator@10.31.38.60 'tail -f /var/log/apache2/access.log'
+ssh administrator@10.31.38.61 'tail -f /var/log/apache2/access.log'
 ```
 
 ---

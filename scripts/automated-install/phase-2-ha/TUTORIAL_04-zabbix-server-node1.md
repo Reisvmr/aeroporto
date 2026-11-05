@@ -1,7 +1,7 @@
-# 📊 TUTORIAL 04 — Zabbix Server 7.0 · NODE 1 (zbx-server-01)
+# 📊 TUTORIAL 04 — Zabbix Server 7.0 + Frontend · NODE 1 (zbx-server-01)
 
 > **Servidor:** zbx-server-01 — IP `10.31.38.60`  
-> **Objetivo:** Instalar e configurar o Zabbix Server 7.0 LTS no primeiro nó do cluster HA  
+> **Objetivo:** Instalar Zabbix Server 7.0 LTS **e** Zabbix Frontend (Apache + PHP) no primeiro nó do cluster HA  
 > **Pré-requisito:** TUTORIAL_01 (pg-01) e TUTORIAL_03 (vip-01/vip-02) concluídos
 
 ---
@@ -32,6 +32,9 @@ hostname -I | awk '{print $1}'
 # Testar conectividade com PostgreSQL Primary
 timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01 acessível" || echo "✗ pg-01 INACESSÍVEL"
 
+# Testar conectividade com vip-01
+timeout 5 bash -c '</dev/tcp/10.31.38.70/22' && echo "✓ vip-01 acessível" || echo "✗ vip-01 INACESSÍVEL"
+
 # Verificar espaço em /var (mínimo 20GB)
 df -BG /var | awk 'NR==2{print $4}'
 ```
@@ -47,9 +50,8 @@ DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
 ---
 
-## ETAPA 3 — Instalar Zabbix Server 7.0
+## ETAPA 3 — Instalar Zabbix Server + Frontend + Agent2
 
-> ℹ️ **Frontend não instalado aqui** — o Zabbix Frontend vai nos servidores zbx-fe-01/02 (TUTORIAL_04b).  
 > ℹ️ **Ubuntu 26.04 (resolute):** o pacote `zabbix-release` aponta para `noble` — corrigir sources.list após instalação.
 
 ```bash
@@ -69,14 +71,17 @@ grep resolute /etc/apt/sources.list.d/zabbix.list
 
 apt-get update
 
-# Instalar Zabbix Server + Agent2 + sql-scripts
+# Instalar Zabbix Server + Agent2 + sql-scripts + Frontend
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
     zabbix-server-pgsql \
     zabbix-agent2 \
-    zabbix-sql-scripts
+    zabbix-sql-scripts \
+    apache2 php php-xml php-bcmath php-mbstring php-gd \
+    php-ldap php-pgsql php-curl libapache2-mod-php \
+    zabbix-frontend-php zabbix-apache-conf
 ```
 
-✅ **Verificação:** `zabbix_server --version`
+✅ **Verificação:** `zabbix_server --version && php -v && apache2 -v`
 
 ---
 
@@ -168,22 +173,80 @@ PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d
 
 ---
 
-## ETAPA 7 — Iniciar serviços
+## ETAPA 7 — Configurar Zabbix Frontend
+
+### 7.1 — Criar zabbix.conf.php
 
 ```bash
-systemctl enable zabbix-server zabbix-agent2
-systemctl restart zabbix-server zabbix-agent2
+cat > /etc/zabbix/zabbix.conf.php << PHP_EOF
+<?php
+global \$DB;
 
-# Aguardar e verificar logs
+\$DB['TYPE']      = 'POSTGRESQL';
+\$DB['SERVER']    = '10.31.38.64';     // pg-01 Primary
+\$DB['PORT']      = '5432';
+\$DB['DATABASE']  = 'zabbix';
+\$DB['USER']      = 'zabbix';
+\$DB['PASSWORD']  = '${DB_PASS:-TROQUEPELASENHADOBANCO}';
+\$DB['SCHEMA']    = '';
+
+\$ZBX_SERVER      = '10.31.38.60';     // zbx-server-01 (local)
+\$ZBX_SERVER_PORT = '10051';
+\$ZBX_SERVER_NAME = 'Aeroporto HA';
+PHP_EOF
+
+chmod 640 /etc/zabbix/zabbix.conf.php
+chown www-data:www-data /etc/zabbix/zabbix.conf.php
+
+# Confirmar
+cat /etc/zabbix/zabbix.conf.php
+```
+
+### 7.2 — Configurar Apache e PHP
+
+```bash
+# Habilitar módulos e configuração Zabbix
+a2enmod rewrite
+a2enconf zabbix
+
+# Timezone PHP (todas as versões instaladas)
+for f in /etc/php/*/apache2/php.ini; do
+    sed -i "s|;date.timezone =|date.timezone = America/Sao_Paulo|" "$f"
+    sed -i "s|^memory_limit = .*|memory_limit = 256M|" "$f"
+    sed -i "s|^max_execution_time = .*|max_execution_time = 300|" "$f"
+done
+
+# Verificar
+for f in /etc/php/*/apache2/php.ini; do
+    echo "$f:"
+    grep -E "date.timezone|memory_limit|max_execution_time" "$f"
+done
+```
+
+---
+
+## ETAPA 8 — Iniciar serviços
+
+```bash
+systemctl enable zabbix-server zabbix-agent2 apache2
+systemctl restart zabbix-server zabbix-agent2 apache2
+
+# Aguardar e verificar logs do Server
 sleep 10
 tail -30 /var/log/zabbix/zabbix_server.log
 ```
 
-✅ **Esperado nos logs:** `started [ha manager]`, `started [availability manager]`, sem erros `Z3001`.
+✅ **Esperado nos logs do Server:** `started [ha manager]`, `started [availability manager]`, sem erros `Z3001`.
+
+```bash
+# Verificar acesso local ao Frontend
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost/zabbix/
+# Esperado: 200 ou 302
+```
 
 ---
 
-## ETAPA 8 — Configurar chave SSH para sincronização entre nodes
+## ETAPA 9 — Configurar chave SSH para sincronização entre nodes
 
 > ⚠️ O diretório `/home/zabbix/.ssh` não existe por padrão — crie antes do keygen.
 
@@ -204,14 +267,14 @@ cat /home/zabbix/.ssh/id_rsa.pub
 
 ---
 
-## ETAPA 9 — Verificação final
+## ETAPA 10 — Verificação final
 
 ```bash
 # Status dos serviços
-systemctl status zabbix-server zabbix-agent2 --no-pager
+systemctl status zabbix-server zabbix-agent2 apache2 --no-pager
 
-# Porta do Zabbix Server (10051)
-ss -tlnp | grep 10051
+# Portas ouvindo (10051 = Server, 80 = Frontend)
+ss -tlnp | grep -E '10051|:80'
 
 # Conexão com banco
 PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d zabbix -c "SELECT COUNT(*) FROM hosts;"
@@ -219,6 +282,9 @@ PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d
 # Status HA (deve aparecer node1 como active)
 PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d zabbix \
     -c "SELECT name, address, status, lastaccess FROM ha_node;"
+
+# Acesso ao Frontend
+curl -Ls http://localhost/zabbix/ -o /dev/null -w "HTTP: %{http_code}\n"
 ```
 
 ---
@@ -229,12 +295,14 @@ PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d
 |---|---|
 | `zabbix-server` | `active (running)` |
 | `zabbix-agent2` | `active (running)` |
+| `apache2` | `active (running)` |
 | Porta 10051 | ouvindo |
-| DBHost | `10.31.38.60` nos logs, conexão em `10.31.38.64` |
+| Porta 80 | ouvindo |
+| HTTP `/zabbix/` | 200 ou 302 |
 | ha_node | node1 como `active` |
 
 ---
 
 ## 📌 Próximo passo
 
-➡️ **TUTORIAL_04c** — Instalar Zabbix Server node2 (`zbx-server-02 / 10.31.38.61`)
+➡️ **TUTORIAL_04c** — Instalar Zabbix Server + Frontend node2 (`zbx-server-02 / 10.31.38.61`)

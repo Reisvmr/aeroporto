@@ -161,6 +161,6 @@ watch -n 10 "PGPASSWORD='TROQUEPELASENHADOBANCO' psql -h 10.31.38.64 -U zabbix -
 
 ## 📌 Próximos passos
 
-1. ➡️ **TUTORIAL_04b** — Instalar Zabbix Frontend (zbx-fe-01 / zbx-fe-02)
+1. ➡️ **TUTORIAL_04f** — Ativar backends Zabbix Frontend no HAProxy (vip-01 / vip-02)
 2. ➡️ Configurar templates e hosts no Zabbix via `http://10.31.38.72/zabbix`
 3. ➡️ **TUTORIAL_05** — Instalar Grafana HA
