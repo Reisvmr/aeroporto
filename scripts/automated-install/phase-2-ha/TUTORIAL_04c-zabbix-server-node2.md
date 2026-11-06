@@ -1,310 +1,310 @@
-# 📊 TUTORIAL 04c — Zabbix Server 7.0 + Frontend · NODE 2 (zbx-server-02)
+# TUTORIAL 04c — Zabbix 7.0 LTS: Server HA + Frontend Nginx — NODE 2
 
-> **Servidor:** zbx-server-02 — IP `10.31.38.61`  
-> **Objetivo:** Instalar Zabbix Server 7.0 LTS **e** Zabbix Frontend (Apache + PHP) no segundo nó do cluster HA  
-> **Pré-requisito:** TUTORIAL_04 (zbx-server-01) **totalmente concluído**
+> **Versão revisada:** 2.0 — 05/11/2026  
+> **Alvo:** `zbx-server-02` — **IP planejado:** `10.31.38.61` (confirmar com `ip -br addr`; o TUTORIAL_04 registrou uma captura SSH ambígua entre `.60` e `.61`)  
+> **SO:** Ubuntu 26.04 *Resolute*  
+> **Banco compartilhado:** PostgreSQL `10.31.38.64:5432`, banco `zabbix` (o **mesmo** do NODE 1)  
+> **Primeiro nó:** `zbx-server-01` — `10.31.38.60` (TUTORIAL_04 concluído e validado)  
+> **Objetivo:** instalar o segundo nó do HA nativo do Zabbix Server e o frontend **Nginx + PHP-FPM**, idêntico ao NODE 1.  
+> **Escopo:** NODE 2. Não configura VIP, HAProxy nem HA do PostgreSQL.
 
----
+## 0. Alterações importantes em relação ao tutorial original
 
-## 📋 Pré-requisitos
+- Mesma arquitetura do TUTORIAL_04 v2.0: **Nginx + PHP-FPM**, sem `zabbix-apache-conf` ativo.
+- HA nativo via `HANodeName=zbx-server-02` e `NodeAddress=10.31.38.61:10051`. **`NodeID=2` não existe no Zabbix 7.0** e foi removido.
+- `WorkerProcesses=8` removido: não é parâmetro válido do Zabbix Server 7.0.
+- **O schema não é importado neste nó.** O banco já foi populado pelo NODE 1.
+- `zabbix.conf.php` **não fixa** `$ZBX_SERVER`/`$ZBX_SERVER_PORT`: o frontend descobre o nó ativo pela tabela `ha_node`. O tutorial anterior apontava para `10.31.38.61`, o que quebraria o frontend sempre que o NODE 2 estivesse em standby.
+- A senha **não aparece em comandos, variáveis exportadas nem no Markdown**; é lida sem eco.
+- Removidos `apt-get upgrade -y`, a remoção cega do repositório e o `sed noble→resolute` sem verificação prévia.
+- Removida a troca de chaves SSH entre usuários `zabbix`: **o HA nativo não utiliza SSH**; a comunicação entre nós é feita exclusivamente pelo banco. Se houver outra necessidade (ex.: sincronizar scripts externos), trate-a em procedimento próprio, com usuário e chave dedicados.
 
-- PostgreSQL HA (pg-01 `10.31.38.64`) rodando com banco `zabbix` já criado
-- zbx-server-01 (`10.31.38.60`) instalado, ativo e com HA funcionando
-- IP estático `10.31.38.61` já configurado neste servidor
+## 1. Pré-requisitos e pontos de parada
 
----
+Execute como `root` no **zbx-server-02**.
 
-## 🔧 Variável — defina antes de executar
+**PARE** se qualquer item abaixo falhar:
+
+1. TUTORIAL_04 concluído: `zabbix_server -R ha_status` no NODE 1 mostra `zbx-server-01` como **active**.
+2. O IP real deste host confere com o planejado (`10.31.38.61`) e **é diferente** do `NodeAddress` do NODE 1.
+3. O hostname/`HANodeName` `zbx-server-02` ainda não está registrado por outro host.
 
 ```bash
-export DB_PASS="TROQUEPELASENHADOBANCO"   # Mesma senha usada no node1
+set -o pipefail
+hostnamectl --static
+ip -br addr
+cat /etc/os-release | grep -E '^(PRETTY_NAME|VERSION_CODENAME)='
+ss -lntp | grep -E ':(80|443|8080|10051)\b' || true
+systemctl is-active zabbix-server apache2 nginx || true
+apt-cache policy zabbix-server-pgsql zabbix-frontend-php zabbix-nginx-conf
+command -v zabbix_server && zabbix_server --version | head -3
+timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo 'pg-01:5432 OK' || echo 'pg-01:5432 FALHA'
+timeout 5 bash -c '</dev/tcp/10.31.38.60/10051' && echo 'node1:10051 OK' || echo 'node1:10051 FALHA'
 ```
 
----
+> Os nós **não precisam** se comunicar entre si pela porta 10051 para o HA funcionar; o teste serve apenas para confirmar que o NODE 1 está ativo e alcançável pela rede. Se a política de rede bloquear esse fluxo, valide pelo `ha_status` do NODE 1.
 
-## ETAPA 1 — Verificar pré-requisitos
+## 2. Backup das configurações existentes
 
 ```bash
-# Confirmar IP do node
-hostname -I | awk '{print $1}'
-# Esperado: 10.31.38.61
-
-# Testar conectividade com PostgreSQL Primary
-timeout 5 bash -c '</dev/tcp/10.31.38.64/5432' && echo "✓ pg-01 acessível" || echo "✗ pg-01 INACESSÍVEL"
-
-# Testar conectividade com node1 (deve estar instalado)
-timeout 5 bash -c '</dev/tcp/10.31.38.60/10051' && echo "✓ zbx-server-01:10051 acessível" || echo "✗ zbx-server-01 INACESSÍVEL"
-timeout 5 bash -c '</dev/tcp/10.31.38.60/80' && echo "✓ zbx-server-01:80 acessível" || echo "✗ zbx-server-01:80 INACESSÍVEL"
-
-# Verificar espaço em /var (mínimo 20GB)
-df -BG /var | awk 'NR==2{print $4}'
+BACKUP="/root/backup-zbx-node2-$(date +%Y%m%d-%H%M%S)"
+mkdir -m 700 -p "$BACKUP"
+for dir in /etc/zabbix /etc/nginx /etc/apache2 /etc/php; do
+  if [ -e "$dir" ]; then cp -a "$dir" "$BACKUP/"; fi
+done
+printf 'Backup local: %s\n' "$BACKUP"
 ```
 
----
+## 3. Repositório e instalação de pacotes
 
-## ETAPA 2 — Atualizar sistema
+Se o `apt-cache policy` da etapa 1 já mostra candidatos da Zabbix 7.0, **não reinstale** `zabbix-release`. Caso não haja candidato, configure o repositório oficial **exatamente como no NODE 1** (compare `/etc/apt/sources.list.d/zabbix*` entre os dois nós) — as versões de pacote dos dois nós devem ser idênticas.
 
 ```bash
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+apt-mark showhold
+apt-get -s install zabbix-server-pgsql zabbix-agent2 \
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl \
+  zabbix-frontend-php zabbix-nginx-conf
 ```
 
----
-
-## ETAPA 3 — Instalar Zabbix Server + Frontend + Agent2
-
-> ℹ️ Mesmo procedimento do node1.  
-> ℹ️ **Ubuntu 26.04 (resolute):** corrigir sources.list de `noble` para `resolute` após instalação.
+**Confirme na simulação** que nenhum componente importante será removido e que a versão de `zabbix-server-pgsql` é a mesma do NODE 1 (`dpkg-query -W zabbix-server-pgsql` em ambos). Versões diferentes de servidor no mesmo banco não são suportadas.
 
 ```bash
-# Remover repositório antigo (se existir)
-rm -f /etc/apt/sources.list.d/zabbix.list
-rm -f /usr/share/keyrings/zabbix-archive-keyring.gpg
-
-# Instalar pacote de release oficial do Zabbix para Ubuntu 26.04
-wget https://repo.zabbix.com/zabbix/7.0/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest+ubuntu26.04_all.deb
-dpkg -i zabbix-release_latest+ubuntu26.04_all.deb
-
-# Corrigir sources.list: trocar 'noble' por 'resolute'
-sed -i 's/noble/resolute/g' /etc/apt/sources.list.d/zabbix.list
-
-# Verificar
-grep resolute /etc/apt/sources.list.d/zabbix.list
-
-apt-get update
-
-# Instalar Zabbix Server + Agent2 + sql-scripts + Frontend
-DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    zabbix-server-pgsql \
-    zabbix-agent2 \
-    zabbix-sql-scripts \
-    apache2 php php-xml php-bcmath php-mbstring php-gd \
-    php-ldap php-pgsql php-curl libapache2-mod-php \
-    zabbix-frontend-php zabbix-apache-conf
+DEBIAN_FRONTEND=noninteractive apt-get install -y zabbix-server-pgsql zabbix-agent2 \
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl \
+  zabbix-frontend-php zabbix-nginx-conf
 ```
 
-✅ **Verificação:** `zabbix_server --version && php -v && apache2 -v`
+> `zabbix-sql-scripts` **não é necessário** neste nó, pois o schema não será importado aqui.
 
----
-
-## ETAPA 4 — Configurar Zabbix Server
-
-### 4.1 — Backup da configuração original
+## 4. Verificar o banco compartilhado (sem importar schema)
 
 ```bash
-cp /etc/zabbix/zabbix_server.conf /etc/zabbix/zabbix_server.conf.backup
+psql -W -h 10.31.38.64 -p 5432 -U zabbix -d zabbix \
+  -c "SELECT to_regclass('public.dbversion') AS zabbix_schema;" \
+  -c "SELECT name, address, port, status FROM ha_node ORDER BY name;"
 ```
 
-### 4.2 — Configurar banco de dados
+- `dbversion` presente e `zbx-server-01` listado: prossiga.
+- `dbversion` ausente: **PARE**. O NODE 1 não concluiu a importação; não importe a partir deste nó.
+- Já existe uma linha `zbx-server-02` com outro endereço: **PARE** e investigue (instalação anterior, IP trocado). Remova registros obsoletos apenas com `zabbix_server -R ha_remove_node=<nome>` a partir do nó ativo, nunca por `DELETE` manual.
 
-> ⚠️ No arquivo padrão, `DBHost` e `DBPassword` ficam **comentados** (`# DBHost=`).  
-> Os comandos abaixo já tratam esse padrão corretamente.
+Mapa de `status` em `ha_node`: `0` standby, `1` stopped, `2` unavailable, `3` active.
+
+## 5. Configurar Zabbix Server e HA nativo
+
+### 5.1 Verificar parâmetros atuais
 
 ```bash
-sed -i "s/^# DBHost=.*/DBHost=10.31.38.64/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^DBName=.*/DBName=zabbix/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^DBUser=.*/DBUser=zabbix/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^# DBPassword=.*/DBPassword=${DB_PASS:-TROQUEPELASENHADOBANCO}/" /etc/zabbix/zabbix_server.conf
-
-# Confirmar (todas devem aparecer sem #)
-grep -n "^DBHost\|^DBName\|^DBUser\|^DBPassword" /etc/zabbix/zabbix_server.conf
+CONF=/etc/zabbix/zabbix_server.conf
+test -f "$CONF" || { echo 'ERRO: zabbix_server.conf ausente'; exit 1; }
+grep -nE '^[[:space:]]*(DBHost|DBName|DBUser|DBPassword|HANodeName|NodeAddress|ListenPort|CacheSize|HistoryCacheSize|ValueCacheSize)=' "$CONF" \
+  | sed -E 's/(DBPassword=).*/\1[OCULTO]/'
 ```
 
-### 4.3 — Configurar HA (NodeID = 2)
+### 5.2 Atualizar campos pontuais
 
-> ⚠️ Node2 usa `NodeID=2` — diferente do node1 que usa `NodeID=1`.
+Mesmo procedimento do NODE 1, mudando **apenas** `HANodeName` e `NodeAddress`. A senha deve ser a mesma configurada no NODE 1.
 
 ```bash
-sed -i "s/^# NodeID=/NodeID=/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^NodeID=.*/NodeID=2/" /etc/zabbix/zabbix_server.conf
+read -r -s -p 'Senha atual do usuário zabbix no PostgreSQL: ' DB_PASS
+printf '\n'
+export DB_PASS
+python3 - <<'PY'
+import os, re, pathlib
+p = pathlib.Path('/etc/zabbix/zabbix_server.conf')
+content = p.read_text()
+updates = {
+    'DBHost': '10.31.38.64',
+    'DBName': 'zabbix',
+    'DBUser': 'zabbix',
+    'DBPassword': os.environ['DB_PASS'],
+    'HANodeName': 'zbx-server-02',
+    'NodeAddress': '10.31.38.61:10051',
+}
+for key, val in updates.items():
+    pat = re.compile(r'^\s*#?\s*' + re.escape(key) + r'\s*=.*$', re.M)
+    content = pat.sub('', content)
+    content = content.rstrip() + '\n' + key + '=' + val + '\n'
+p.write_text(content)
+PY
+unset DB_PASS
+chown root:zabbix "$CONF"
+chmod 640 "$CONF"
 ```
 
-### 4.4 — Configurar performance
+> **Não execute este bloco se o IP real do NODE 2 for diferente de `10.31.38.61`**; ajuste `NodeAddress` primeiro.
+
+### 5.3 Paridade com o NODE 1
+
+Os parâmetros de cache e processos devem ser **iguais** nos dois nós, pois qualquer um pode assumir a carga total após failover.
 
 ```bash
-sed -i "s/^# CacheSize=.*/CacheSize=512M/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^# HistoryCacheSize=.*/HistoryCacheSize=256M/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^# ValueCacheSize=.*/ValueCacheSize=256M/" /etc/zabbix/zabbix_server.conf
-sed -i "s/^# WorkerProcesses=.*/WorkerProcesses=8/" /etc/zabbix/zabbix_server.conf
+grep -E '^(DBHost|DBName|DBUser|HANodeName|NodeAddress|CacheSize|HistoryCacheSize|ValueCacheSize|Start[A-Za-z]+|LogFile)=' "$CONF" | sort
+grep -nE '^\s*(NodeID|WorkerProcesses)=' "$CONF" || true
 ```
 
-### 4.5 — Configurar logging
+Compare a saída com a do NODE 1 (`ssh` ou cópia manual): somente `HANodeName` e `NodeAddress` podem diferir. Se `NodeID` ou `WorkerProcesses` aparecerem ativos, remova-os após backup.
+
+### 5.4 Iniciar e validar HA
 
 ```bash
-sed -i "s/^LogFile=.*/LogFile=\/var\/log\/zabbix\/zabbix_server.log/" /etc/zabbix/zabbix_server.conf
+systemctl enable --now zabbix-server zabbix-agent2
+systemctl restart zabbix-server
+systemctl status zabbix-server --no-pager -l
+zabbix_server -R ha_status
+journalctl -u zabbix-server -n 80 --no-pager
 ```
 
----
+**Esperado:** este nó entra em modo **standby**, e `zbx-server-01` permanece **active**. Em standby, o NODE 2 **não abre a porta 10051** para coleta — isso é normal e afeta os health checks do HAProxy (ver etapa 10).
 
-## ETAPA 5 — Iniciar Zabbix Server
+Se o NODE 2 assumir como **active**, PARE: o NODE 1 não está ativo ou não está atualizando `lastaccess` no banco. Verifique o NODE 1 antes de prosseguir.
 
-> ⚠️ **NÃO importar schema aqui** — o banco já foi populado pelo node1.
+## 6. Garantir que o Apache não concorra com o Nginx
 
 ```bash
-systemctl enable zabbix-server zabbix-agent2
-systemctl restart zabbix-server zabbix-agent2
-
-# Aguardar e verificar logs
-sleep 10
-tail -30 /var/log/zabbix/zabbix_server.log
+systemctl status apache2 nginx --no-pager -l || true
+ss -lntp | grep -E ':(80|443|8080)\b' || true
 ```
 
-✅ **Esperado nos logs:** `started [ha manager]` e node2 como `standby` sem erros `Z3001`.
-
----
-
-## ETAPA 6 — Configurar Zabbix Frontend
-
-### 6.1 — Criar zabbix.conf.php
+Se o Apache estiver instalado e não hospedar outros sites:
 
 ```bash
-cat > /etc/zabbix/zabbix.conf.php << PHP_EOF
-<?php
-global \$DB;
-
-\$DB['TYPE']      = 'POSTGRESQL';
-\$DB['SERVER']    = '10.31.38.64';     // pg-01 Primary
-\$DB['PORT']      = '5432';
-\$DB['DATABASE']  = 'zabbix';
-\$DB['USER']      = 'zabbix';
-\$DB['PASSWORD']  = '${DB_PASS:-TROQUEPELASENHADOBANCO}';
-\$DB['SCHEMA']    = '';
-
-\$ZBX_SERVER      = '10.31.38.61';     // zbx-server-02 (local)
-\$ZBX_SERVER_PORT = '10051';
-\$ZBX_SERVER_NAME = 'Aeroporto HA';
-PHP_EOF
-
-chmod 640 /etc/zabbix/zabbix.conf.php
-chown www-data:www-data /etc/zabbix/zabbix.conf.php
-
-# Confirmar
-cat /etc/zabbix/zabbix.conf.php
+systemctl disable --now apache2 || true
+systemctl mask apache2
 ```
 
-### 6.2 — Configurar Apache e PHP
+## 7. Configurar PHP-FPM e Nginx do Zabbix
+
+Repita a **etapa 7 do TUTORIAL_04** sem alterações, garantindo que `/etc/zabbix/nginx.conf` e `/etc/zabbix/php-fpm.conf` fiquem equivalentes aos do NODE 1:
+
+- `listen 80;` e `server_name _;` no bloco `server` do Zabbix;
+- `fastcgi_pass` apontando para o socket realmente criado pelo pool (confirmar em `/run/php/`);
+- timezone `America/Sao_Paulo`, `memory_limit 256M`, `max_execution_time 300`, `max_input_time 300`.
+
+Para comparar com o NODE 1 sem copiar arquivos cegamente:
 
 ```bash
-# Habilitar módulos e configuração Zabbix
-a2enmod rewrite
-a2enconf zabbix
-
-# Timezone PHP (todas as versões instaladas)
-for f in /etc/php/*/apache2/php.ini; do
-    sed -i "s|;date.timezone =|date.timezone = America/Sao_Paulo|" "$f"
-    sed -i "s|^memory_limit = .*|memory_limit = 256M|" "$f"
-    sed -i "s|^max_execution_time = .*|max_execution_time = 300|" "$f"
-done
-
-# Verificar
-for f in /etc/php/*/apache2/php.ini; do
-    echo "$f:"
-    grep -E "date.timezone|memory_limit|max_execution_time" "$f"
-done
+sha256sum /etc/zabbix/nginx.conf /etc/zabbix/php-fpm.conf
+# Execute o mesmo no NODE 1; diferenças precisam ser justificadas.
 ```
 
----
-
-## ETAPA 7 — Iniciar Apache
+Ativação:
 
 ```bash
-systemctl enable apache2
-systemctl restart apache2
-
-# Aguardar e verificar
-sleep 5
-systemctl status apache2 --no-pager
-
-# Verificar acesso local ao Frontend
-curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://localhost/zabbix/
-# Esperado: 200 ou 302
+PHP_FPM_SERVICE=$(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1; exit}')
+test -n "$PHP_FPM_SERVICE" || { echo 'ERRO: PHP-FPM não instalado'; exit 1; }
+echo "Serviço selecionado: $PHP_FPM_SERVICE"
+systemctl enable --now "$PHP_FPM_SERVICE"
+systemctl restart "$PHP_FPM_SERVICE"
+nginx -t && systemctl enable --now nginx && systemctl restart nginx
 ```
 
----
+> **Não continue se `nginx -t` falhar.**
 
-## ETAPA 8 — Troca de chaves SSH entre os nodes
+## 8. Frontend e banco compartilhado
 
-> ⚠️ O diretório `/home/zabbix/.ssh` não existe por padrão — crie antes do keygen.
-
-### 8.1 — Gerar chave no node2
+Localize o caminho efetivo do arquivo de configuração do frontend, como no NODE 1:
 
 ```bash
-mkdir -p /home/zabbix/.ssh
-chown zabbix:zabbix /home/zabbix/.ssh
-chmod 700 /home/zabbix/.ssh
-
-sudo -u zabbix ssh-keygen -t rsa -b 4096 -f /home/zabbix/.ssh/id_rsa -N ""
+find /etc/zabbix /usr/share/zabbix -name zabbix.conf.php -o -name zabbix.conf.php.example 2>/dev/null
+readlink -f /usr/share/zabbix/ui/conf/zabbix.conf.php 2>/dev/null || true
 ```
 
-### 8.2 — Copiar chave do node2 → node1
+Configure pelo **assistente web** em `http://10.31.38.61/` (ou o caminho efetivo do Nginx) com os mesmos valores do NODE 1:
+
+| Campo | Valor |
+|---|---|
+| Tipo de banco | PostgreSQL |
+| Host | `10.31.38.64` |
+| Porta | `5432` |
+| Base | `zabbix` |
+| Usuário | `zabbix` |
+| Senha | Digitar no assistente; não inserir no repositório |
+| Nome visível | `Aeroporto HA` (igual ao NODE 1) |
+
+O assistente **não recria** o schema; apenas grava `zabbix.conf.php`. Após salvar:
 
 ```bash
-# Especificar a chave com -i para evitar erro "No identities found"
-sudo -u zabbix ssh-copy-id -i /home/zabbix/.ssh/id_rsa.pub zabbix@10.31.38.60
+F=$(find /etc/zabbix /usr/share/zabbix -name zabbix.conf.php 2>/dev/null | head -1)
+echo "$F"; ls -l "$F"
+grep -nE 'ZBX_SERVER(_PORT)?\b' "$F" || echo 'OK: ZBX_SERVER/ZBX_SERVER_PORT não definidos'
 ```
 
-### 8.3 — No node1: copiar chave do node1 → node2
+Se `$ZBX_SERVER` ou `$ZBX_SERVER_PORT` estiverem definidos com valor, comente-os: com HA nativo, um valor fixo faz o frontend reportar "Zabbix server is not running" sempre que o nó fixado estiver em standby.
+
+## 9. Verificação completa do NODE 2 e do cluster
+
+No **NODE 2**:
 
 ```bash
-# Execute este comando NO zbx-server-01 (10.31.38.60)
-sudo -u zabbix ssh-copy-id -i /home/zabbix/.ssh/id_rsa.pub zabbix@10.31.38.61
+hostname -f; ip -br addr
+systemctl is-active zabbix-server zabbix-agent2 nginx "$PHP_FPM_SERVICE"
+systemctl is-active apache2 || true
+nginx -t
+ss -lntp | grep -E ':(80|10051)\b' || true
+curl -i --max-time 10 http://127.0.0.1/ | head -25
+zabbix_server -R ha_status
+journalctl -u zabbix-server -n 40 --no-pager
+tail -n 50 /var/log/nginx/error.log
 ```
 
-### 8.4 — Testar SSH entre nodes
+No **NODE 1**, confirme a visão do cluster:
 
 ```bash
-# No node2: testar acesso ao node1
-sudo -u zabbix ssh zabbix@10.31.38.60 hostname
-
-# No node1: testar acesso ao node2
-# sudo -u zabbix ssh zabbix@10.31.38.61 hostname
+zabbix_server -R ha_status
 ```
 
----
+**Critérios de aceite:**
 
-## ETAPA 9 — Verificação final do cluster HA
+1. IP do NODE 2 e `NodeAddress` conferem; `HANodeName` único (`zbx-server-02`).
+2. `ha_status` em ambos os nós lista `zbx-server-01` **active** e `zbx-server-02` **standby**, sem erros.
+3. Versões de `zabbix-server-pgsql` idênticas nos dois nós.
+4. Nginx e PHP-FPM ativos, Apache inativo/mascarado.
+5. `http://10.31.38.61/` exibe login do **Zabbix** (não a página padrão do Nginx) e **não** mostra o aviso "Zabbix server is not running" — o frontend do NODE 2 deve encontrar o NODE 1 ativo pelo banco.
+6. Login com o mesmo usuário em `http://10.31.38.60/` e `http://10.31.38.61/` exibe os mesmos dados.
+
+### 9.1 Teste de failover controlado (somente em janela aprovada)
 
 ```bash
-# Status dos serviços no node2
-systemctl status zabbix-server zabbix-agent2 apache2 --no-pager
-
-# Portas ouvindo (10051 = Server, 80 = Frontend)
-ss -tlnp | grep -E '10051|:80'
-
-# Status HA (node1=active, node2=standby)
-PGPASSWORD="${DB_PASS:-TROQUEPELASENHADOBANCO}" psql -h 10.31.38.64 -U zabbix -d zabbix \
-    -c "SELECT name, address, status, lastaccess FROM ha_node;"
-
-# Acesso ao Frontend local
-curl -Ls http://localhost/zabbix/ -o /dev/null -w "HTTP: %{http_code}\n"
+# No NODE 1:
+systemctl stop zabbix-server
+# No NODE 2, aguardar o failover (padrão: até ~1 min, conforme failover delay):
+watch -n 5 'zabbix_server -R ha_status'
+# Esperado: zbx-server-02 active, zbx-server-01 stopped.
+# Retornar o NODE 1 (ele volta como standby; não há failback automático):
+systemctl start zabbix-server
 ```
 
-✅ **Resultado esperado:**
+Registre horários de parada e de assunção para evidência. Não force failback desnecessário; se a política exigir o NODE 1 como ativo, faça-o em nova janela parando o NODE 2 da mesma forma.
 
+## 10. Impacto no HAProxy (TUTORIAL_04d / 04f)
+
+- **Porta 10051 (`backend_zabbix`):** como apenas o nó ativo escuta em 10051, o health check TCP marcará o nó standby como `DOWN`. Esse é o comportamento esperado e faz o HAProxy encaminhar só ao ativo. Ainda assim, prefira configurar agentes e proxies com **os dois endereços** (`Server=10.31.38.60,10.31.38.61` / `ServerActive=10.31.38.60;10.31.38.61`), que é o método suportado pelo Zabbix.
+- **Porta 80 (`backend_zabbix_frontend`):** ambos os frontends ficam `UP`. O frontend Nginx serve na raiz `/`, e não mais em `/zabbix/`; os health checks e testes dos tutoriais 04d/04f devem ser ajustados para validar a página de login da aplicação na raiz.
+
+## 11. Rollback do NODE 2
+
+O NODE 2 pode ser retirado sem impacto no NODE 1:
+
+```bash
+systemctl disable --now zabbix-server
+# No nó ATIVO, remover o registro do nó retirado:
+# zabbix_server -R ha_remove_node=zbx-server-02
 ```
-     name      |   address     | status  |     lastaccess
----------------+---------------+---------+--------------------
- zbx-server-01 | 10.31.38.60   | active  | 2026-...
- zbx-server-02 | 10.31.38.61   | standby | 2026-...
-```
 
----
+Para a camada web, siga a etapa 10 do TUTORIAL_04 usando o backup da etapa 2 deste tutorial.
 
-## ✅ Checklist do cluster Zabbix HA
+## 12. Próxima etapa
 
-| Item | node1 | node2 |
-|---|---|---|
-| `zabbix-server` | ✅ active (running) | ✅ active (running) |
-| `zabbix-agent2` | ✅ active (running) | ✅ active (running) |
-| `apache2` | ✅ active (running) | ✅ active (running) |
-| Porta 10051 | ✅ ouvindo | ✅ ouvindo |
-| Porta 80 | ✅ ouvindo | ✅ ouvindo |
-| NodeID | ✅ 1 | ✅ 2 |
-| HA status | ✅ active | ✅ standby |
-| SSH entre nodes | ✅ | ✅ |
+➡️ **TUTORIAL_04d** — Backends Zabbix Server no HAProxy, seguido de **TUTORIAL_04f** — Backends do frontend, ambos considerando a etapa 10 acima.
 
----
+## Fontes de validação
 
-## 📌 Próximo passo
+- Tutorial original do projeto: https://github.com/Reisvmr/aeroporto/blob/main/scripts/automated-install/phase-2-ha/TUTORIAL_04c-zabbix-server-node2.md
+- Zabbix 7.0 — Alta disponibilidade: https://www.zabbix.com/documentation/7.0/en/manual/concepts/server/ha
+- Zabbix 7.0 — Controle em tempo de execução (`ha_status`, `ha_remove_node`): https://www.zabbix.com/documentation/7.0/en/manual/concepts/server#runtime-control
+- Zabbix 7.0 — Instalação do frontend: https://www.zabbix.com/documentation/7.0/en/manual/installation/frontend
+- Zabbix 7.0 — Parâmetros do servidor: https://www.zabbix.com/documentation/7.0/en/manual/appendix/config/zabbix_server
 
-➡️ **TUTORIAL_04d** — Ativar backends Zabbix Server no HAProxy (vip-01 / vip-02)
+> **Nota operacional:** este documento revisa a instalação, mas não substitui testes executados no ambiente. Confirme os IPs reais dos dois nós e o estado do PostgreSQL antes de aplicar os comandos.
