@@ -91,7 +91,7 @@ apt-cache policy zabbix-server-pgsql | head -8
 apt-mark showhold
 apt-get -s install "zabbix-server-pgsql=$ZBX_VER" "zabbix-agent2=$ZBX_VER" \
   "zabbix-frontend-php=$ZBX_VER" "zabbix-nginx-conf=$ZBX_VER" \
-  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl postgresql-client
 ```
 
 **Confirme na simulação** que nenhum componente importante será removido e que os pacotes `zabbix-*` vêm na versão `$ZBX_VER`. Versões diferentes de servidor no mesmo banco não são suportadas.
@@ -99,7 +99,7 @@ apt-get -s install "zabbix-server-pgsql=$ZBX_VER" "zabbix-agent2=$ZBX_VER" \
 ```bash
 DEBIAN_FRONTEND=noninteractive apt-get install -y "zabbix-server-pgsql=$ZBX_VER" "zabbix-agent2=$ZBX_VER" \
   "zabbix-frontend-php=$ZBX_VER" "zabbix-nginx-conf=$ZBX_VER" \
-  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl postgresql-client
 apt-mark hold zabbix-server-pgsql zabbix-agent2 zabbix-frontend-php zabbix-nginx-conf
 ```
 
@@ -151,7 +151,7 @@ PGPASSWORD="$DB_PASS" psql -w -h 10.31.38.64 -U zabbix -d zabbix -tAc 'SELECT 1'
   && echo 'SENHA OK' || echo 'SENHA REJEITADA: NAO PROSSIGA'
 ```
 
-Se retornar `SENHA REJEITADA`, **PARE** e repita o passo A com a senha em uso pelo NODE 1. Requer o cliente `psql` (`postgresql-client`).
+Se retornar `SENHA REJEITADA`, **PARE** e repita o passo A com a senha em uso pelo NODE 1. Requer o cliente `psql` (`postgresql-client`, instalado na etapa 3.3).
 
 **Passo C** — gravar a senha validada:
 
