@@ -313,15 +313,30 @@ zabbix_server -R ha_status
 
 ### 9.1 Teste de failover controlado (somente em janela aprovada)
 
+Os comandos rodam em **nós diferentes**; não cole o bloco inteiro em um só terminal. Com o serviço parado, `zabbix_server -R` no próprio nó falha com `Cannot connect to service "rtc"` — isso é esperado; consulte sempre o nó que está rodando.
+
+**1. No zbx-server-01** — parar o nó ativo:
+
 ```bash
-# No NODE 1:
-systemctl stop zabbix-server
-# No NODE 2, aguardar o failover (padrão: até ~1 min, conforme failover delay):
-watch -n 5 'zabbix_server -R ha_status'
-# Esperado: zbx-server-02 active, zbx-server-01 stopped.
-# Retornar o NODE 1 (ele volta como standby; não há failback automático):
-systemctl start zabbix-server
+date; systemctl stop zabbix-server
 ```
+
+**2. No zbx-server-02** — acompanhar a assunção (pode levar até o *failover delay*, padrão 60 s; saia com Ctrl+C):
+
+```bash
+watch -n 5 'zabbix_server -R ha_status'
+```
+
+Esperado: `zbx-server-02 active` e `zbx-server-01 stopped`.
+
+**3. No zbx-server-01** — retornar o nó (ele volta como **standby**; não há failback automático):
+
+```bash
+systemctl start zabbix-server; sleep 15; zabbix_server -R ha_status
+tail -n 20 /var/log/zabbix/zabbix_server.log
+```
+
+Esperado: `zbx-server-01 standby` com *Last Access* de poucos segundos. Se permanecer `stopped`, verifique o log: `password authentication failed` indica que a senha do banco mudou e o `DBPassword` deste nó não foi atualizado (etapa 5.2 do TUTORIAL_04).
 
 Registre horários de parada e de assunção para evidência. Não force failback desnecessário; se a política exigir o NODE 1 como ativo, faça-o em nova janela parando o NODE 2 da mesma forma.
 
