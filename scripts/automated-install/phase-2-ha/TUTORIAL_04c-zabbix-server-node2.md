@@ -106,9 +106,26 @@ grep -nE '^[[:space:]]*(DBHost|DBName|DBUser|DBPassword|HANodeName|NodeAddress|L
 
 Mesmo procedimento do NODE 1, mudando **apenas** `HANodeName` e `NodeAddress`. A senha deve ser a mesma configurada no NODE 1.
 
+> ⚠️ **Execute em três colagens separadas.** Se o `read` for colado junto com outras linhas, ele consome a linha seguinte como senha.
+
+**Passo A** — cole e execute **só esta linha**, depois digite a senha e pressione Enter:
+
 ```bash
-read -r -s -p 'Senha atual do usuário zabbix no PostgreSQL: ' DB_PASS
-printf '\n'
+read -r -s -p 'Senha atual do usuário zabbix no PostgreSQL: ' DB_PASS; echo
+```
+
+**Passo B** — testar a senha lida **antes** de gravá-la (não altera nada):
+
+```bash
+PGPASSWORD="$DB_PASS" psql -w -h 10.31.38.64 -U zabbix -d zabbix -tAc 'SELECT 1' \
+  && echo 'SENHA OK' || echo 'SENHA REJEITADA: NAO PROSSIGA'
+```
+
+Se retornar `SENHA REJEITADA`, **PARE** e repita o passo A com a senha em uso pelo NODE 1. Requer o cliente `psql` (`postgresql-client`).
+
+**Passo C** — gravar a senha validada:
+
+```bash
 export DB_PASS
 python3 - <<'PY'
 import os, re, pathlib

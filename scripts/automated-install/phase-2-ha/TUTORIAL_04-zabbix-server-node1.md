@@ -119,9 +119,26 @@ grep -nE '^[[:space:]]*(DBHost|DBName|DBUser|DBPassword|HANodeName|NodeAddress|L
 
 O comando abaixo atualiza entradas existentes comentadas ou não, evitando duplicar parâmetros. A senha é lida sem eco. **Não use a senha exposta anteriormente como credencial definitiva.**
 
+> ⚠️ **Execute em três colagens separadas.** Se o `read` for colado junto com outras linhas, ele consome a linha seguinte como senha.
+
+**Passo A** — cole e execute **só esta linha**, depois digite a senha e pressione Enter:
+
 ```bash
-read -r -s -p 'Senha atual do usuário zabbix no PostgreSQL: ' DB_PASS
-printf '\n'
+read -r -s -p 'Senha atual do usuário zabbix no PostgreSQL: ' DB_PASS; echo
+```
+
+**Passo B** — testar a senha lida **antes** de gravá-la (não altera nada):
+
+```bash
+PGPASSWORD="$DB_PASS" psql -w -h 10.31.38.64 -U zabbix -d zabbix -tAc 'SELECT 1' \
+  && echo 'SENHA OK' || echo 'SENHA REJEITADA: NAO PROSSIGA'
+```
+
+Se retornar `SENHA REJEITADA` (`password authentication failed`), **PARE**: repita o passo A ou redefina a senha no pg-01 com `sudo -u postgres psql -c '\password zabbix'` (prompt sem eco) e volte ao passo A. Gravar uma senha não testada deixa o serviço `active` no systemd, porém preso em `database is down: reconnecting`, sem abrir a porta 10051.
+
+**Passo C** — gravar a senha validada:
+
+```bash
 export DB_PASS
 python3 - <<'PY'
 import os, re, pathlib
@@ -318,6 +335,8 @@ tail -n 50 /var/log/nginx/error.log
 7. A configuração do frontend não fixa o endereço do servidor e, quando o NODE 2 estiver pronto, deve funcionar após failover nativo.
 
 ## 10. Rollback do componente web (se necessário)
+
+> ⛔ **NÃO execute esta etapa como parte da instalação.** Ela desfaz as etapas 6 e 7 e derruba o frontend. Use-a somente se a validação da etapa 9 falhar na camada web e a decisão for voltar ao Apache.
 
 Os passos abaixo restauram **somente a camada web**. Não revertem o banco nem o estado do HA:
 

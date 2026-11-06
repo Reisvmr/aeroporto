@@ -1,166 +1,136 @@
-# ⚡ TUTORIAL 04d — Ativar Backends Zabbix no HAProxy
+# TUTORIAL 04d — Zabbix Server (porta 10051) e o HAProxy
 
-> **Servidores:** vip-01 (`10.31.38.70`) e vip-02 (`10.31.38.71`)  
-> **Objetivo:** Ativar os backends do Zabbix Server no HAProxy após os dois nodes estarem operacionais  
-> **Pré-requisito:** TUTORIAL_04 (node1) e TUTORIAL_04c (node2) **totalmente concluídos**
+> **Versão revisada:** 2.0 — 05/11/2026  
+> **Alvo:** `vip-01` (`10.31.38.70`) e `vip-02` (`10.31.38.71`); VIP flutuante planejado `10.31.38.72` (confirmar com `ip -br addr` no MASTER)  
+> **Pré-requisito:** TUTORIAL_04 e TUTORIAL_04c v2.0 concluídos: `zabbix_server -R ha_status` mostra um nó **active** e o outro **standby**  
+> **Objetivo:** decidir e, se aprovado, publicar o trapper do Zabbix Server (10051) pelo VIP.  
+> **Escopo:** somente a porta 10051. O frontend web (porta 80) é tratado no TUTORIAL_04f.
 
----
+## 0. Alterações importantes em relação ao tutorial original
 
-## 📋 Pré-requisitos
+- O tutorial anterior fazia `sed` em `server zabbix_01 10.31.38.60:10051 disabled`, linha que **não existe** em nenhum `haproxy.cfg` gerado pelo projeto: no TUTORIAL_03 o `backend_zabbix` aponta para a porta **80** (frontend web) e o script `03-vip-haproxy-keepalived.sh` não cria backend 10051. Os `sed` não alteravam nada e o `reload` passava em silêncio.
+- Reutilizar `backend_zabbix` (HTTP:80) para 10051 misturaria tráfego web e trapper; o 10051 exige **`mode tcp`** e frontend próprio.
+- Com HA nativo, **apenas o nó active escuta em 10051**. O standby ficará `DOWN` no HAProxy, e isso é o esperado.
+- Removido `PGPASSWORD` em linha de comando; o estado do cluster é verificado com `zabbix_server -R ha_status`.
+- Removida a credencial do stats web em comandos `curl`; a verificação usa o socket administrativo local.
 
-- zbx-server-01 (`10.31.38.60`) rodando — `systemctl status zabbix-server` ativo
-- zbx-server-02 (`10.31.38.61`) rodando — `systemctl status zabbix-server` ativo
-- HAProxy com backends `zabbix_01` e `zabbix_02` no estado `disabled` (configurado no TUTORIAL_03)
+## 1. Decisão de arquitetura (registrar antes de alterar)
 
----
+O Zabbix suporta HA nativo **sem balanceador** para a porta 10051: agentes e proxies recebem os dois endereços e descobrem o nó ativo sozinhos.
 
-## ETAPA 1 — Verificar estado atual dos backends
+| Opção | Configuração | Prós | Contras |
+|---|---|---|---|
+| **A — Recomendada** | Agentes: `Server=10.31.38.60,10.31.38.61` e `ServerActive=10.31.38.60;10.31.38.61`. Proxies: `Server=10.31.38.60;10.31.38.61` | Método oficial; preserva o IP de origem real; sem dependência do VIP | Lista de nós em cada agente/proxy (gerenciável via AWX) |
+| B — VIP TCP | Agentes/proxies apontam para `10.31.38.72:10051` | Endpoint único | O Zabbix passa a ver o IP do HAProxy como origem (afeta autorregistro por IP, `Allowed hosts` de trapper e diagnóstico); um ponto a mais de falha e de latência no failover |
 
-Execute em **vip-01 (`10.31.38.70`)**:
+**Se a decisão for A, este tutorial termina aqui**: não altere o HAProxy. Siga para a etapa 6 (validação) e depois para o TUTORIAL_04f.
+
+As etapas 2 a 5 aplicam-se **somente à opção B**, aprovada formalmente.
+
+## 2. Inspecionar o `haproxy.cfg` real (vip-01 e vip-02)
 
 ```bash
-ssh administrator@10.31.38.70
-
-# Listar estado dos backends Zabbix
-echo 'show servers state backend_zabbix' | socat /run/haproxy/admin.sock stdio
+hostname; ip -br addr | grep -E '10\.31\.38\.7[0-4]' || true
+haproxy -v | head -1
+grep -nE '^\s*(frontend|backend|listen)\b|10051|zabbix|zbx_' /etc/haproxy/haproxy.cfg
+echo 'show servers state' | socat /run/haproxy/admin.sock stdio | grep -iE 'zabbix|zbx' || true
 ```
 
-> ✅ Esperado antes da ativação: backends com estado `disabled` ou `MAINT`.
+**PARE** e anote se:
 
----
+- já existir algum `bind` em `:10051` (evitar duplicidade);
+- os dois VIPs tiverem `haproxy.cfg` diferentes entre si (`sha256sum /etc/haproxy/haproxy.cfg` nos dois): alinhe-os antes.
 
-## ETAPA 2 — Ativar backends via Runtime API
-
-> ℹ️ A Runtime API ativa imediatamente **sem interromper** conexões existentes.  
-> Execute em **vip-01 E em vip-02** (ambos precisam ser atualizados).
-
-### vip-01 (`10.31.38.70`)
+## 3. Backup
 
 ```bash
-ssh administrator@10.31.38.70
-
-# Ativar backend node1
-echo 'enable server backend_zabbix/zabbix_01' | socat /run/haproxy/admin.sock stdio
-
-# Ativar backend node2
-echo 'enable server backend_zabbix/zabbix_02' | socat /run/haproxy/admin.sock stdio
-
-# Confirmar ativação
-echo 'show servers state backend_zabbix' | socat /run/haproxy/admin.sock stdio
+cp -a /etc/haproxy/haproxy.cfg "/etc/haproxy/haproxy.cfg.bak-04d-$(date +%Y%m%d-%H%M%S)"
 ```
 
-### vip-02 (`10.31.38.71`)
+## 4. Adicionar o bloco TCP 10051 (somente opção B)
+
+Acrescente ao final do `haproxy.cfg`, **sem** alterar `backend_zabbix`/`backend_zabbix_frontend`:
 
 ```bash
-ssh administrator@10.31.38.71
+cat >> /etc/haproxy/haproxy.cfg <<'EOF'
 
-# Ativar backend node1
-echo 'enable server backend_zabbix/zabbix_01' | socat /run/haproxy/admin.sock stdio
+# ── Zabbix Server trapper (HA nativo: apenas o nó active escuta) ─────────
+frontend zabbix_trapper
+    mode tcp
+    option tcplog
+    bind 10.31.38.72:10051
+    timeout client 5m
+    default_backend backend_zabbix_trapper
 
-# Ativar backend node2
-echo 'enable server backend_zabbix/zabbix_02' | socat /run/haproxy/admin.sock stdio
-
-# Confirmar ativação
-echo 'show servers state backend_zabbix' | socat /run/haproxy/admin.sock stdio
+backend backend_zabbix_trapper
+    mode tcp
+    option tcp-check
+    timeout server 5m
+    server zbx_srv_01 10.31.38.60:10051 check inter 5s fall 3 rise 2
+    server zbx_srv_02 10.31.38.61:10051 check inter 5s fall 3 rise 2
+EOF
 ```
 
----
+> O `bind` no IP do VIP exige `net.ipv4.ip_nonlocal_bind = 1` no nó BACKUP (configurado no TUTORIAL_03; confirme com `sysctl net.ipv4.ip_nonlocal_bind`). Ajuste o IP se o VIP real for diferente.
 
-## ETAPA 3 — Persistir configuração no haproxy.cfg
-
-> ⚠️ A Runtime API é temporária — reiniciar o HAProxy restaura o estado `disabled`.  
-> Execute este bloco para persistir em **vip-01 E em vip-02**.
+Valide e recarregue, **primeiro no BACKUP e depois no MASTER**:
 
 ```bash
-# Verificar linha atual no arquivo (confirmar padrão antes de substituir)
-grep -n "zabbix_0" /etc/haproxy/haproxy.cfg
+haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl reload haproxy
+systemctl status haproxy --no-pager -l | head -15
+```
 
-# Remover 'disabled' e adicionar healthcheck nas duas entradas
-sed -i 's/server zabbix_01 10\.31\.38\.60:10051 disabled/server zabbix_01 10.31.38.60:10051 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
-sed -i 's/server zabbix_02 10\.31\.38\.61:10051 disabled/server zabbix_02 10.31.38.61:10051 check inter 5s fall 3 rise 2/' /etc/haproxy/haproxy.cfg
+Se `haproxy -c` falhar, **não recarregue**: restaure o backup da etapa 3.
 
-# Confirmar alteração
-grep -n "zabbix_0" /etc/haproxy/haproxy.cfg
+## 5. Ajustar o Zabbix para a origem via HAProxy (somente opção B)
 
-# Validar configuração e recarregar
+Como as conexões chegam com o IP do HAProxy (`10.31.38.70`/`.71`):
+
+- Nos agentes em modo passivo, isso **não se aplica** (o servidor é que conecta no agente; o tráfego não passa pelo VIP).
+- Em itens *trapper* com `Allowed hosts` e em regras de autorregistro que usem IP, inclua os IPs dos VIPs ou revise a regra.
+- Documente no inventário (AWX) que `ServerActive` aponta para o VIP.
+
+## 6. Validação
+
+Nos nós Zabbix (vale para as duas opções):
+
+```bash
+zabbix_server -R ha_status
+```
+
+Nos VIPs (opção B):
+
+```bash
+echo 'show servers state backend_zabbix_trapper' | socat /run/haproxy/admin.sock stdio
+echo 'show stat' | socat /run/haproxy/admin.sock stdio | awk -F, '$1=="backend_zabbix_trapper"{print $2, $18}'
+timeout 5 bash -c '</dev/tcp/10.31.38.72/10051' && echo 'VIP:10051 OK' || echo 'VIP:10051 FALHA'
+```
+
+**Critérios de aceite (opção B):**
+
+1. Exatamente **um** servidor `UP`, o que `ha_status` indica como active; o outro `DOWN` (L4CON).
+2. Um agente de teste com `ServerActive=10.31.38.72` recebe a lista de checks ativos (`zabbix_agent2 -t` não basta; confira em *Monitoring → Hosts* a disponibilidade ZBX ativa).
+3. Após failover controlado (TUTORIAL_04c, etapa 9.1), o HAProxy inverte `UP`/`DOWN` em até `fall × inter` (≈15 s) **após** o novo nó assumir.
+
+**Critérios de aceite (opção A):** um agente de teste com os dois endereços permanece disponível durante o failover controlado.
+
+## 7. Rollback (opção B)
+
+```bash
+cp -a /etc/haproxy/haproxy.cfg.bak-04d-<timestamp> /etc/haproxy/haproxy.cfg
 haproxy -c -f /etc/haproxy/haproxy.cfg && systemctl reload haproxy
 ```
 
----
+Reaponte agentes/proxies para a opção A **antes** de remover o bloco, para não perder coleta.
 
-## ETAPA 4 — Validação completa
+## 8. Próxima etapa
 
-### 4.1 — Status dos backends no HAProxy
+➡️ **TUTORIAL_04f** — Backends do frontend web Zabbix (porta 80) no HAProxy.
 
-Execute em **vip-01 e vip-02**:
+## Fontes de validação
 
-```bash
-# Estado detalhado dos backends Zabbix
-echo 'show servers state backend_zabbix' | socat /run/haproxy/admin.sock stdio
+- Tutorial original do projeto: https://github.com/Reisvmr/aeroporto/blob/main/scripts/automated-install/phase-2-ha/TUTORIAL_04d-haproxy-zabbix-backends.md
+- Zabbix 7.0 — Alta disponibilidade (configuração de agentes e proxies): https://www.zabbix.com/documentation/7.0/en/manual/concepts/server/ha
+- HAProxy — Configuration Manual (`mode tcp`, `option tcp-check`): https://docs.haproxy.org/
 
-# Estatísticas resumidas
-echo 'show stat' | socat /run/haproxy/admin.sock stdio | grep zabbix | cut -d',' -f1-2,18-19
-```
-
-> ✅ Ambos os backends devem aparecer com estado `UP`.
-
-### 4.2 — Stats via interface web
-
-```bash
-# Abrir no browser ou verificar via curl
-curl -s 'http://10.31.38.70:8404/stats' | grep -i "zabbix"
-curl -s 'http://10.31.38.71:8404/stats' | grep -i "zabbix"
-```
-
-> ✅ Acesse `http://10.31.38.70:8404/stats` no browser para visualização gráfica.
-
-### 4.3 — Testar acesso via VIP flutuante
-
-```bash
-# Testar porta 10051 via VIP flutuante (Keepalived)
-timeout 5 bash -c '</dev/tcp/10.31.38.72/10051' && echo "✓ Zabbix VIP acessível na porta 10051" || echo "✗ VIP INACESSÍVEL"
-
-# Verificar frontend (se zbx-fe-01/02 já estiver instalado)
-curl -sk http://10.31.38.72/zabbix/ -o /dev/null -w "HTTP: %{http_code}\n"
-```
-
-### 4.4 — Confirmar HA pelo banco
-
-```bash
-# Verificar status dos nodes no cluster Zabbix (execute em zbx-server-01 ou 02)
-PGPASSWORD="TROQUEPELASENHADOBANCO" psql -h 10.31.38.64 -U zabbix -d zabbix \
-    -c "SELECT name, address, status, lastaccess FROM ha_node ORDER BY status;"
-```
-
----
-
-## ✅ Checklist final
-
-| Item | vip-01 | vip-02 |
-|---|---|---|
-| `backend_zabbix/zabbix_01` | ✅ UP | ✅ UP |
-| `backend_zabbix/zabbix_02` | ✅ UP | ✅ UP |
-| `haproxy.cfg` persistido | ✅ | ✅ |
-| HAProxy recarregado | ✅ | ✅ |
-| VIP flutuante (`10.31.38.72`) | ✅ porta 10051 acessível | — |
-
----
-
-## 🔍 Monitoramento contínuo
-
-```bash
-# Logs HAProxy em tempo real (execute em vip-01 ou vip-02)
-journalctl -u haproxy -f
-
-# Status HA Zabbix pelo banco (execute em qualquer zbx-server)
-watch -n 10 "PGPASSWORD='TROQUEPELASENHADOBANCO' psql -h 10.31.38.64 -U zabbix -d zabbix \
-    -c \"SELECT name, address, status, lastaccess FROM ha_node;\""
-```
-
----
-
-## 📌 Próximos passos
-
-1. ➡️ **TUTORIAL_04f** — Ativar backends Zabbix Frontend no HAProxy (vip-01 / vip-02)
-2. ➡️ Configurar templates e hosts no Zabbix via `http://10.31.38.72/zabbix`
-3. ➡️ **TUTORIAL_05** — Instalar Grafana HA
+> **Nota operacional:** este documento revisa o procedimento, mas não substitui testes executados no ambiente.
