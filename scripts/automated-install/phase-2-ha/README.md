@@ -12,8 +12,8 @@
 |--------------------|----------------|------------------------------------|--------|
 | zbx-server-01      | 10.31.38.60    | Zabbix Server ativo                | 3      |
 | zbx-server-02      | 10.31.38.61    | Zabbix Server standby              | 3      |
-| **zbx-fe-01**      | **10.31.38.62**| **Zabbix Frontend ativo**          | **3b** |
-| **zbx-fe-02**      | **10.31.38.63**| **Zabbix Frontend standby**        | **3b** |
+| ~~zbx-fe-01~~      | ~~10.31.38.62~~| Eliminado — frontend consolidado no zbx-server-01 (Nginx) | — |
+| ~~zbx-fe-02~~      | ~~10.31.38.63~~| Eliminado — frontend consolidado no zbx-server-02 (Nginx) | — |
 | pg-01              | 10.31.38.64    | PostgreSQL Primary                 | 1      |
 | pg-02              | 10.31.38.65    | PostgreSQL Replica                 | 1      |
 | grafana-01         | 10.31.38.66    | Grafana ativo                      | 4      |
@@ -30,6 +30,25 @@
 > 📌 **3 VIPs de serviço**, todos gerenciados pelo Keepalived (VRRP), migram automaticamente entre vip-01 e vip-02 em caso de falha:  
 > `10.31.38.72` (Zabbix) · `10.31.38.73` (Grafana) · `10.31.38.74` (AWX)  
 > Clientes acessam sempre pelos VIPs, nunca diretamente pelos IPs dos servidores.
+
+## 🧭 Roteiro atual (tutoriais revisados)
+
+Os **tutoriais `TUTORIAL_*.md` são o procedimento de referência**. Os scripts `.sh` desta pasta foram escritos antes da consolidação do frontend no Zabbix Server e da migração para Nginx; `04-zabbix-server-ha.sh`, `04b-zabbix-frontend-ha.sh` e `03-vip-haproxy-keepalived.sh` ainda usam Apache, `NodeID` e os IPs `10.31.38.62/63`. **Não os execute para o Zabbix** sem revisão.
+
+| Ordem | Tutorial | Servidores |
+|---|---|---|
+| 0 | `TUTORIAL_00-prerequisitos-validacao.md`, `TUTORIAL_00-validar-particoes-padrao.md` | Todos |
+| 1 | `TUTORIAL_01-postgresql-primary.md` | pg-01 |
+| 2 | `TUTORIAL_02-postgresql-standby.md` | pg-02 |
+| 2b | `TUTORIAL_02b-postgresql-vip-keepalived.md` (opcional, requer IP) | pg-01, pg-02 |
+| 3 | `TUTORIAL_03-vip-haproxy-keepalived.md` | vip-01, vip-02 |
+| 4 | `TUTORIAL_04-zabbix-server-node1.md` | zbx-server-01 |
+| 4c | `TUTORIAL_04c-zabbix-server-node2.md` | zbx-server-02 |
+| 4d | `TUTORIAL_04d-haproxy-zabbix-backends.md` (porta 10051 — decisão) | vip-01, vip-02 |
+| 4f | `TUTORIAL_04f-haproxy-zabbix-frontend-backends.md` | vip-01, vip-02 |
+| 5 | `TUTORIAL_05-grafana-ha.md` | grafana-01/02 |
+| 6 | `TUTORIAL_06-awx-ha.md` | awx-01/02 |
+| 7–9 | `TUTORIAL_07-pre-execution-validation.md`, `TUTORIAL_08-09-validate-and-failover.md` | Todos |
 
 ---
 
@@ -181,29 +200,16 @@ curl -u admin:haproxy@stats http://10.31.38.70:8404/stats
 ```
 
 ### **SEMANA 3: Zabbix HA** (~4 horas)
-```bash
-# Scripts a criar:
-# - 04-zabbix-server-ha.sh (zbx-server-01/02)
-```
+Seguir `TUTORIAL_04` (zbx-server-01), `TUTORIAL_04c` (zbx-server-02), `TUTORIAL_04d` e `TUTORIAL_04f` (HAProxy). O script `04-zabbix-server-ha.sh` está desatualizado em relação a esses tutoriais.
 
 ### **SEMANA 4: Grafana HA** (~3 horas)
-```bash
-# Scripts a criar:
-# - 05-grafana-ha.sh (grafana-01/02)
-```
+Script `05-grafana-ha.sh` (grafana-01/02) — ver `TUTORIAL_05-grafana-ha.md`.
 
 ### **SEMANA 5: AWX HA** (~4 horas)
-```bash
-# Scripts a criar:
-# - 06-awx-ha.sh (awx-01/02)
-```
+Script `06-awx-ha.sh` (awx-01/02) — ver `TUTORIAL_06-awx-ha.md`.
 
 ### **SEMANA 6: Validação e Testes** (~4 horas)
-```bash
-# Scripts a criar:
-# - validate-ha-health.sh
-# - failover-test.sh
-```
+Scripts `07-pre-execution-validation.sh`, `08-validate-ha-health.sh` e `09-failover-test.sh` — ver `TUTORIAL_07` e `TUTORIAL_08-09`.
 
 ---
 
@@ -270,8 +276,8 @@ export INTERFACE="eth0"  # Se não for detectada automaticamente
          ▼
 ┌─────────────────────────────────────┐
 │  TESTES HA (Semana 6)               │
-│  validate-ha-health.sh              │
-│  failover-test.sh                   │
+│  08-validate-ha-health.sh           │
+│  09-failover-test.sh                │
 └─────────────────────────────────────┘
 ```
 

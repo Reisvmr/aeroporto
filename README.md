@@ -7,11 +7,12 @@ Repositório para centralizar documentos, cronogramas, scripts, runbooks e artef
 ## 🎯 Objetivo
 
 Implantar uma plataforma completa de monitoramento e automação baseada em:
-- **Zabbix 7.0 LTS** - Monitoramento em cluster HA (2 nodes)
-- **PostgreSQL 16** - Banco de dados em replicação streaming (Primary/Standby)
-- **Grafana 10.x** - Visualização em cluster HA (2 nodes)
-- **Ansible AWX 22.x** - Automação em cluster HA (2 nodes) com Docker
-- **HAProxy + Keepalived** - Load balancing com failover automático <5s
+- **Zabbix 7.0 LTS** - Server em HA nativo (2 nós) com frontend Nginx em cada nó
+- **PostgreSQL 16** - Replicação streaming (Primary/Replica)
+- **Grafana** - Visualização em 2 nós
+- **Ansible AWX** - Automação em 2 nós com Docker
+- **HAProxy + Keepalived** - Publicação das aplicações via VIP com failover automático
+- **Sistema operacional:** Ubuntu 26.04 LTS (*resolute*)
 - **Retenção de dados:** 180 dias
 - **Volume estimado:** ~316 GB úteis
 
@@ -21,356 +22,101 @@ Implantar uma plataforma completa de monitoramento e automação baseada em:
 
 ```
 aeroporto/
-├── README.md (este arquivo)
-├── PLANO_REFATORACAO_HA.md               ← Estratégia Phase 2 HA
-├── README_HA_ANALISE.md                  ← Análise técnica detalhada
+├── README.md                              ← este arquivo
+├── PLANO_REFATORACAO_HA.md                ← plano original da Fase 2 HA (histórico, 24/10/2026)
+├── README_HA_ANALISE.md                   ← análise técnica original da Fase 2 HA (histórico)
+├── SCRIPTS_AWX_GRAFANA_CONCLUIDO.md       ← relatório de entrega dos scripts AWX/Grafana (histórico)
+├── SCRIPTS_INSTALACAO_RESUMO.md           ← resumo dos scripts da Fase 1 (histórico)
+├── SETUP_PROCEDURES_README.md             ← índice dos procedimentos de setup da Fase 1
 │
 ├── docs/
-│   ├── cliente/                          ← Checklists e pré-requisitos
-│   ├── cronogramas/                      ← Gantt, WBS, RACI
-│   ├── execucao/                         ← Runbooks passo a passo
-│   ├── propostas/                        ← Propostas e planos
-│   └── referencias/                      ← Materiais técnicos
+│   ├── cliente/                           ← checklists, inventário de equipamentos, análise dos 676 ativos
+│   ├── cronogramas/                       ← Gantt
+│   ├── execucao/                          ← runbooks por fase, controle de evidências, plano por servidor
+│   ├── instalacao/                        ← matriz de análise da arquitetura (Fase 1)
+│   ├── planejamento/                      ← análise de trabalho remanescente
+│   ├── propostas/                         ← proposta de execução
+│   ├── validacao/                         ← relatórios de validação dos servidores
+│   └── *.md                               ← guias de Grafana, Docker e scripts interativos
 │
-├── scripts/automated-install/
-│   ├── phase-2-ha/                       ← ⭐ FASE 2 HA (NOVA)
-│   │   ├── 00-prerequisitos-validacao.sh (462 linhas) - Validação
-│   │   ├── 01-postgresql-primary.sh      (356 linhas) - DB Primary
-│   │   ├── 01-postgresql-standby.sh      (359 linhas) - DB Standby
-│   │   ├── 02-zabbix-server-ha.sh        (443 linhas) - Zabbix HA 🆕
-│   │   ├── 04-awx-ha.sh                  (477 linhas) - AWX HA 🆕
-│   │   ├── 05-grafana-ha.sh              (380 linhas) - Grafana HA 🆕
-│   │   ├── 06-vip-haproxy-keepalived.sh  (494 linhas) - Load Balancer
-│   │   ├── README.md                     (358 linhas) - Guia de uso
-│   │   └── INICIO-RAPIDO.sh              (199 linhas) - Helper
-│   │
-│   └── phase-1-standalone/               ← Fase 1 (obsoleto, manter para ref)
-│       └── (scripts antigos)
+├── scripts/
+│   ├── check-server-*.sh, run-check*.sh   ← validação de servidores (v1.0, v1.1 IMPROVED, v2.0)
+│   ├── check-hardware-*.sh                ← validação de hardware AWX/Grafana
+│   ├── setup-prerequisites.sh, validate-access.{sh,py}
+│   └── automated-install/
+│       ├── 01..05-*.sh, validate-*.sh     ← instalação Fase 1 (servidor único)
+│       ├── common/, config/, docs/        ← funções, exemplo de ambiente, guias da Fase 1
+│       └── phase-2-ha/                    ← ⭐ Fase 2 HA: tutoriais TUTORIAL_*.md e scripts 00..09
 │
 ├── awx_automacoes/
-│   └── inventories/
-│       ├── postgresql_ha.yml             ← PostgreSQL Primary + Standby
-│       ├── zabbix_ha.yml                 ← Zabbix 2 nodes
-│       ├── grafana_ha.yml                ← Grafana 2 nodes
-│       ├── awx_ha.yml                    ← AWX 2 nodes
-│       └── vip_lb_ha.yml                 ← VIP + Load Balancer
+│   ├── inventories/                       ← inventários por tipo de ativo e por cluster HA
+│   └── playbooks/                         ← playbooks 01, 03, 04, 06, 07
 │
-├── zabbix_templates/                    ← Templates Zabbix
-├── grafana_dashboards/                  ← Dashboards Grafana
-└── awx_playbooks/                       ← Playbooks Ansible
+└── zabbix_templates/                      ← templates YAML por tipo de ativo
 ```
 
 ---
 
-## 🏗️ Arquitetura Phase 2 HA (10 Servidores)
+## 🏗️ Arquitetura Fase 2 HA
 
-```
-CAMADA 1: ARMAZENAMENTO HA
-├── PostgreSQL Primary    (pg-01 / 10.31.38.64)
-├── PostgreSQL Standby    (pg-02 / 10.31.38.65)
-└── Replicação: Streaming WAL + Failover automático
+| Camada | Servidores | Endereço de acesso |
+|---|---|---|
+| Banco | pg-01 `10.31.38.64` (primary), pg-02 `10.31.38.65` (replica) | `10.31.38.64:5432` (VIP-DB `10.31.38.75` proposto — TUTORIAL_02b) |
+| Zabbix Server + Frontend | zbx-server-01 `10.31.38.60`, zbx-server-02 `10.31.38.61` | Web: VIP `10.31.38.72` |
+| Grafana | grafana-01 `10.31.38.66`, grafana-02 `10.31.38.67` | VIP `10.31.38.73:3000` |
+| AWX | awx-01 `10.31.38.68`, awx-02 `10.31.38.69` | VIP `10.31.38.74:8080` |
+| Load balancer | vip-01 `10.31.38.70` (master), vip-02 `10.31.38.71` (backup) | HAProxy + Keepalived |
 
-CAMADA 2: MONITORAMENTO HA
-├── Zabbix Server 1       (zbx-server-01 / 10.31.38.60)
-├── Zabbix Server 2       (zbx-server-02 / 10.31.38.61)
-├── Shared DB: PostgreSQL HA
-├── Frontend: Via VIP (10.31.38.70:10051)
-└── 676 dispositivos monitorados
+Rede: `10.31.38.0/25`, gateway `10.31.38.1`, VLAN 338.
 
-CAMADA 3: VISUALIZAÇÃO HA
-├── Grafana 1             (grafana-01 / 10.31.38.66)
-├── Grafana 2             (grafana-02 / 10.31.38.67)
-├── Shared DB: PostgreSQL HA
-├── Sessions: PostgreSQL
-└── Frontend: Via VIP (10.31.38.70:3000)
-
-CAMADA 4: AUTOMAÇÃO HA
-├── AWX 1                 (awx-01 / 10.31.38.68)
-├── AWX 2                 (awx-02 / 10.31.38.69)
-├── Shared DB: PostgreSQL HA
-├── Docker Compose (Postgres + Redis + AWX)
-└── Frontend: Via VIP (10.31.38.70:8080)
-
-CAMADA 5: LOAD BALANCER HA
-├── VIP Master            (vip-01 / 10.31.38.70)
-├── VIP Backup            (vip-02 / 10.31.38.71)
-├── HAProxy 2.x
-├── Keepalived VRRP
-└── Failover: <5s automático
-```
+O Zabbix Server usa o **HA nativo** (`HANodeName`/`NodeAddress`): um nó *active*, outro *standby*, coordenados pelo banco. Os servidores dedicados de frontend (`zbx-fe-01/02`, `10.31.38.62/63`) foram **eliminados**; o frontend roda em cada zbx-server.
 
 ---
 
-## 📚 Documentação Principal
+## 🚀 Como instalar - Fase 2 HA
 
-### Phase 2 HA (NOVA - 27/10/2026)
+Siga os tutoriais na ordem indicada em [`scripts/automated-install/phase-2-ha/README.md`](./scripts/automated-install/phase-2-ha/README.md#-roteiro-atual-tutoriais-revisados):
 
-**Planejamento Estratégico:**
-- [`PLANO_REFATORACAO_HA.md`](./PLANO_REFATORACAO_HA.md) - Estratégia completa (399 linhas)
-  - 3 fases de refatoração
-  - 6 semanas de timeline
-  - 6 camadas de impacto
-  - Matriz de decisões técnicas
+1. `TUTORIAL_00` — pré-requisitos e partições (todos os servidores)
+2. `TUTORIAL_01` / `TUTORIAL_02` — PostgreSQL primary e replica (`TUTORIAL_02b` opcional: VIP do banco)
+3. `TUTORIAL_03` — HAProxy + Keepalived
+4. `TUTORIAL_04` / `TUTORIAL_04c` — Zabbix Server + frontend nos dois nós; `TUTORIAL_04d` / `TUTORIAL_04f` — publicação no HAProxy
+5. `TUTORIAL_05` — Grafana; `TUTORIAL_06` — AWX
+6. `TUTORIAL_07` e `TUTORIAL_08-09` — validação e testes de failover
 
-**Análise Técnica:**
-- [`README_HA_ANALISE.md`](./README_HA_ANALISE.md) - Análise detalhada
-  - Arquitetura HA completa
-  - Configurações por componente
-  - Fluxos de failover
-  - Estimativas de capacidade
-
-**Scripts de Instalação:**
-- [`scripts/automated-install/phase-2-ha/README.md`](./scripts/automated-install/phase-2-ha/README.md) - Guia completo
-  - Como usar cada script
-  - Ordem de execução
-  - Validações esperadas
-  - Troubleshooting
-
-### Documentação Original (Fase 1)
-
-- `docs/propostas/` - Propostas originais
-- `docs/cronogramas/` - Cronogramas Gantt
-- `docs/execucao/` - Runbooks originais
-- `docs/referencias/` - Materiais técnicos
+> ⚠️ Os tutoriais são a referência. Os scripts `.sh` do Zabbix (`04-zabbix-server-ha.sh`, `04b-zabbix-frontend-ha.sh`) e o `03-vip-haproxy-keepalived.sh` ainda refletem a arquitetura anterior (Apache, frontend em `10.31.38.62/63`) e não devem ser executados sem revisão.
 
 ---
 
-## 🚀 Como Usar - Phase 2 HA
+## 🔗 Acessos (após instalação)
 
-### Pré-requisitos
-- Ubuntu 20.04 ou 22.04 LTS
-- Servidores zerados (fresh install)
-- 10 VMs conforme especificação acima
-- Conectividade entre servers
-- Acesso root/sudo
+| Serviço | URL |
+|---|---|
+| Zabbix Frontend | `http://10.31.38.72/` (via HAProxy, após TUTORIAL_04f) |
+| Grafana | `http://10.31.38.73:3000` |
+| AWX | `http://10.31.38.74:8080` |
+| PostgreSQL | `10.31.38.64:5432` |
 
-### Ordem de Instalação (Semanas 1-5)
-
-**SEMANA 0: Validação de Pré-requisitos**
-```bash
-cd scripts/automated-install/phase-2-ha/
-sudo chmod +x *.sh
-sudo ./00-prerequisitos-validacao.sh
-```
-
-**SEMANA 1: PostgreSQL HA**
-```bash
-# Em pg-01 (10.31.38.64)
-ssh root@10.31.38.64
-sudo ./01-postgresql-primary.sh
-
-# Em pg-02 (10.31.38.65)
-ssh root@10.31.38.65
-sudo ./01-postgresql-standby.sh
-```
-
-**SEMANA 2: VIP / Load Balancer**
-```bash
-# Em vip-01 (10.31.38.70) - Master
-ssh root@10.31.38.70
-sudo ./06-vip-haproxy-keepalived.sh master
-
-# Em vip-02 (10.31.38.71) - Backup
-ssh root@10.31.38.71
-sudo ./06-vip-haproxy-keepalived.sh backup
-```
-
-**SEMANA 3: Zabbix Server HA**
-```bash
-# Em zbx-server-01 (10.31.38.60)
-ssh root@10.31.38.60
-sudo ./02-zabbix-server-ha.sh node1
-
-# Em zbx-server-02 (10.31.38.61)
-ssh root@10.31.38.61
-sudo ./02-zabbix-server-ha.sh node2
-```
-
-**SEMANA 4: Grafana HA**
-```bash
-# Em grafana-01 (10.31.38.66)
-ssh root@10.31.38.66
-sudo ./05-grafana-ha.sh node1
-
-# Em grafana-02 (10.31.38.67)
-ssh root@10.31.38.67
-sudo ./05-grafana-ha.sh node2
-```
-
-**SEMANA 5: AWX HA**
-```bash
-# Em awx-01 (10.31.38.68)
-ssh root@10.31.38.68
-sudo ./04-awx-ha.sh node1
-
-# Em awx-02 (10.31.38.69)
-ssh root@10.31.38.69
-sudo ./04-awx-ha.sh node2
-```
-
-### Guia Rápido
-Veja [`scripts/automated-install/phase-2-ha/INICIO-RAPIDO.sh`](./scripts/automated-install/phase-2-ha/INICIO-RAPIDO.sh) para comandos prontos.
-
----
-
-## 📊 Estatísticas Phase 2 HA
-
-| Item | Valor |
-|------|-------|
-| **Scripts de instalação** | 7 (validação + 6 componentes) |
-| **Total de linhas** | 3.169 linhas de bash |
-| **Tamanho total** | 108 KB de scripts + 30 KB de docs |
-| **Servidores suportados** | 10 VMs |
-| **Commits GitHub** | 2 commits (a0d7568, 3762ab7) |
-| **Data conclusão** | 27/10/2026 |
-| **Semanas cobertas** | 0-5 (6 opcional) |
-
----
-
-## ✨ Características Principais - Phase 2 HA
-
-### ✅ Alta Disponibilidade Completa
-- **PostgreSQL:** Streaming replication + failover automático
-- **Zabbix:** Cluster 2 nodes com shared database
-- **Grafana:** Cluster 2 nodes com session persistence
-- **AWX:** Cluster 2 nodes com executor distribuído
-- **VIP:** Failover automático <5s via Keepalived
-
-### ✅ Automação Total
-- Scripts parametrizados (node1/node2)
-- Sem credenciais hardcoded
-- Health checks em cada componente
-- Sincronização automática de config
-- Firewall pré-configurado
-
-### ✅ Monitoramento de Escala
-- **676 dispositivos** simultâneos
-- **180 dias** de retenção de dados
-- **~316 GB** de storage estimado
-- **Múltiplas** datasources (SNMP, API, etc)
-
-### ✅ Operação Resiliente
-- Failover automático <5s
-- Dados persistem em PostgreSQL HA
-- Sessions sobrevivem reinicios
-- Sincronização cross-node
-- Logs centralizados
-
----
-
-## 🔗 Acessos VIP (Após Instalação)
-
-| Serviço | URL | Port | Credenciais |
-|---------|-----|------|-------------|
-| **Zabbix Frontend** | http://10.31.38.70:10051 | 10051 | Admin / (defina) |
-| **Grafana** | http://10.31.38.70:3000 | 3000 | admin / (defina) |
-| **AWX** | http://10.31.38.70:8080 | 8080 | admin / (defina) |
-| **PostgreSQL** | 10.31.38.64:5432 | 5432 | awx / (defina) |
-
----
-
-## 📋 Scripts Disponíveis
-
-### Phase 2 HA (Atual - FUNCIONAL)
-
-| Script | Linhas | Função | Status |
-|--------|--------|--------|--------|
-| `00-prerequisitos-validacao.sh` | 462 | Validação de pré-requisitos | ✅ |
-| `01-postgresql-primary.sh` | 356 | PostgreSQL Primary | ✅ |
-| `01-postgresql-standby.sh` | 359 | PostgreSQL Standby | ✅ |
-| `02-zabbix-server-ha.sh` | 443 | Zabbix Server HA | ✅ |
-| `04-awx-ha.sh` | 477 | AWX HA | ✅ |
-| `05-grafana-ha.sh` | 380 | Grafana HA | ✅ |
-| `06-vip-haproxy-keepalived.sh` | 494 | Load Balancer HA | ✅ |
-
-### Phase 1 Standalone (Obsoleto - Referência)
-Mantidos em `scripts/automated-install/phase-1-standalone/` para referência histórica.
+Troque as senhas padrão (Zabbix `Admin`, Grafana `admin`, AWX `admin`) no primeiro acesso.
 
 ---
 
 ## 🔐 Segurança & Credenciais
 
-⚠️ **IMPORTANTE:**
-- Nenhum script contém credenciais hardcoded
-- Todas as senhas são parametrizáveis via:
-  - Variáveis de ambiente
-  - Argumentos de script
-  - Arquivos `.env` locais
-- Usar 1Password ou gerenciador de segredos para credenciais reais
-- Mudar senhas padrão (admin) imediatamente após primeira login
+- Não versione senhas reais. Os tutoriais revisados leem senhas sem eco e testam antes de gravar.
+- **Atenção:** alguns scripts e tutoriais antigos ainda trazem valores padrão que precisam ser trocados antes do uso em produção — por exemplo `REPLICATION_PASS:-repl123` (TUTORIAL_01/02), `stats auth admin:haproxy@stats` e `auth_pass aeroporto_ha` (TUTORIAL_03).
+- Use um gerenciador de segredos para as credenciais reais.
 
 ---
 
-## 📞 Suporte & Contribuições
+## 📋 Evidências e controle
 
-### Problemas?
-1. Verifique os logs em `/tmp/awx-ha-install-*.log` (cada script gera log)
-2. Leia [`scripts/automated-install/phase-2-ha/README.md`](./scripts/automated-install/phase-2-ha/README.md)
-3. Consulte [`PLANO_REFATORACAO_HA.md`](./PLANO_REFATORACAO_HA.md) para decisões técnicas
-4. Abra uma issue no repositório
-
-### Contribuições
-- Pull requests são bem-vindos
-- Mantenha o padrão de scripts (bash com validações)
-- Documente mudanças significativas
-- Teste em servidor zerado antes de submeter
-
----
-
-## 📅 Histórico de Releases
-
-### Phase 2 HA (v2.0) - 27/10/2026
-- ✅ 7 scripts de instalação
-- ✅ 5 inventários Ansible HA
-- ✅ Documentação estratégica
-- ✅ 3.169 linhas de código bash
-- **Status:** Pronto para implementação (Semanas 1-5)
-
-### Phase 1 Standalone (v1.x) - Anterior
-- Descontinuado em favor de Phase 2 HA
-- Manter apenas para referência histórica
-
----
-
-## 📖 Referências Rápidas
-
-**Documentação:**
-- [`PLANO_REFATORACAO_HA.md`](./PLANO_REFATORACAO_HA.md) - Estratégia Phase 2
-- [`README_HA_ANALISE.md`](./README_HA_ANALISE.md) - Análise técnica
-- [`scripts/automated-install/phase-2-ha/README.md`](./scripts/automated-install/phase-2-ha/README.md) - Guia scripts
-- [`scripts/automated-install/phase-2-ha/INICIO-RAPIDO.sh`](./scripts/automated-install/phase-2-ha/INICIO-RAPIDO.sh) - Comandos prontos
-
-**Inventários:**
-- `awx_automacoes/inventories/postgresql_ha.yml` - PostgreSQL
-- `awx_automacoes/inventories/zabbix_ha.yml` - Zabbix
-- `awx_automacoes/inventories/grafana_ha.yml` - Grafana
-- `awx_automacoes/inventories/awx_ha.yml` - AWX
-
----
-
-## 🎉 Status
-
-✅ **Phase 2 HA: 100% CONCLUÍDA**
-- Planejamento estratégico ✅
-- Análise arquitetura ✅
-- Scripts Semana 0 ✅
-- Scripts Semana 1 ✅
-- Scripts Semana 2 ✅
-- Scripts Semana 3 ✅
-- Scripts Semana 4 ✅
-- Scripts Semana 5 ✅
-- Documentação ✅
-- GitHub sincronizado ✅
-
-**Próximas ações:**
-- Semana 6: Testes de failover (scripts opcionais)
-- Semana 7+: Testes de carga e validação
+O padrão de evidências, status report e registro de decisões está em [`docs/execucao/00-controle-evidencias.md`](./docs/execucao/00-controle-evidencias.md); os runbooks por fase estão em [`docs/execucao/`](./docs/execucao/README.md).
 
 ---
 
 **Repositório:** https://github.com/Reisvmr/aeroporto.git  
-**Última atualização:** 27/10/2026  
-**Versão:** Phase 2 HA v2.0  
+**Última atualização:** 06/11/2026  
 **Autor:** Vinicius Reis <reisvmr@gmail.com>
 
 ---

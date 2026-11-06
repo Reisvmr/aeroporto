@@ -33,30 +33,30 @@ awx_automacoes/
 │
 ├── playbooks/               # Playbooks Ansible
 │   ├── 01-deploy-camera-config.yml
-│   ├── 02-deploy-access-control-config.yml
+│   ├── 02-deploy-access-control-config.yml   (planejado — não existe)
 │   ├── 03-restart-failed-services.yml
 │   ├── 04-backup-configurations.yml
-│   ├── 05-update-firmware.yml
+│   ├── 05-update-firmware.yml                (planejado — não existe)
 │   ├── 06-synchronize-ntp.yml
 │   ├── 07-connectivity-test.yml
-│   ├── 08-cleanup-logs.yml
-│   ├── 09-sync-zabbix-grafana.yml
-│   └── 10-generate-reports.yml
+│   ├── 08-cleanup-logs.yml                   (planejado — não existe)
+│   ├── 09-sync-zabbix-grafana.yml            (planejado — não existe)
+│   └── 10-generate-reports.yml               (planejado — não existe)
 │
-├── roles/                   # Roles Ansible reutilizáveis
+├── roles/                   # (planejado — ainda não existe)
 │   ├── camera_deployment/
 │   ├── access_control_deployment/
 │   ├── service_recovery/
 │   ├── firmware_update/
 │   └── monitoring_integration/
 │
-├── docs/                    # Documentação
+├── docs/                    # (planejado — ainda não existe)
 │   ├── INVENTORIES.md
 │   ├── PLAYBOOKS.md
 │   ├── ROLES.md
 │   └── TROUBLESHOOTING.md
 │
-└── scripts/                 # Scripts auxiliares
+└── scripts/                 # (planejado — ainda não existe)
     ├── validate_inventory.sh
     └── dry_run.sh
 ```
@@ -89,8 +89,8 @@ ansible-playbook playbooks/04-backup-configurations.yml
 # Câmeras
 ansible-playbook playbooks/01-deploy-camera-config.yml
 
-# Controle de Acesso
-ansible-playbook playbooks/02-deploy-access-control-config.yml
+# Controle de Acesso (playbook 02 ainda não criado)
+# ansible-playbook playbooks/02-deploy-access-control-config.yml
 ```
 
 ---
@@ -198,10 +198,7 @@ ssh-copy-id -i ~/.ssh/id_rsa.pub admin@192.168.1.101
 
 ## 📖 Documentação Completa
 
-- [Inventários](docs/INVENTORIES.md) - Definições de hosts
-- [Playbooks](docs/PLAYBOOKS.md) - Detalhes de cada playbook
-- [Roles](docs/ROLES.md) - Roles reutilizáveis
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Resolução de problemas
+> Documentos planejados, ainda não criados: `docs/INVENTORIES.md`, `docs/PLAYBOOKS.md`, `docs/ROLES.md`, `docs/TROUBLESHOOTING.md`. Até lá, consulte os próprios arquivos em `inventories/` e `playbooks/`.
 
 ---
 
@@ -240,7 +237,7 @@ tail -f /tmp/*.log
 ## 📞 Suporte
 
 Para problemas, consultar:
-1. [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+1. `docs/TROUBLESHOOTING.md` (planejado — ainda não existe)
 2. Logs em `/tmp/`
 3. Zabbix Frontend para status dos hosts
 
