@@ -57,23 +57,53 @@ printf 'Backup local: %s\n' "$BACKUP"
 
 ## 3. Repositório e instalação de pacotes
 
-Se o `apt-cache policy` da etapa 1 já mostra candidatos da Zabbix 7.0, **não reinstale** `zabbix-release`. Caso não haja candidato, configure o repositório oficial **exatamente como no NODE 1** (compare `/etc/apt/sources.list.d/zabbix*` entre os dois nós) — as versões de pacote dos dois nós devem ser idênticas.
+### 3.1 Versão de referência (NODE 1)
+
+As versões dos dois nós devem ser **idênticas**. No **zbx-server-01**:
 
 ```bash
+dpkg-query -W zabbix-server-pgsql
+```
+
+Na instalação de 06/11/2026 o resultado foi `1:7.0.32-2+ubuntu26.04`. Use **o valor que o NODE 1 mostrar** em `ZBX_VER` abaixo.
+
+### 3.2 Repositório oficial (NODE 2)
+
+Se `apt-cache policy zabbix-server-pgsql` não mostra candidato `+ubuntu26.04`, configure o repositório oficial. O caminho correto é `/zabbix/7.0/ubuntu/` — o caminho `/zabbix/7.0/release/ubuntu/` do tutorial antigo retorna 404, por isso o `dpkg -i` falhava com `cannot access archive`.
+
+```bash
+cd /tmp
+wget -O zabbix-release.deb 'https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_7.0+ubuntu26.04_all.deb'
+dpkg -i zabbix-release.deb
+cat /etc/apt/sources.list.d/zabbix*.list /etc/apt/sources.list.d/zabbix*.sources 2>/dev/null
 apt-get update
-apt-mark showhold
-apt-get -s install zabbix-server-pgsql zabbix-agent2 \
-  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl \
-  zabbix-frontend-php zabbix-nginx-conf
 ```
 
-**Confirme na simulação** que nenhum componente importante será removido e que a versão de `zabbix-server-pgsql` é a mesma do NODE 1 (`dpkg-query -W zabbix-server-pgsql` em ambos). Versões diferentes de servidor no mesmo banco não são suportadas.
+Confirme que a lista aponta para `resolute` (sem `sed` manual) e que `apt-get update` mostra `repo.zabbix.com ... resolute InRelease` sem erro.
+
+**Não instale nenhum pacote `zabbix-*` do repositório do Ubuntu** (versões `+dfsg`): eles têm empacotamento, caminhos de log e versão diferentes dos oficiais. Se algum estiver instalado, remova com `apt-get purge` antes de continuar.
+
+### 3.3 Instalação com versão fixada
 
 ```bash
-DEBIAN_FRONTEND=noninteractive apt-get install -y zabbix-server-pgsql zabbix-agent2 \
-  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl \
-  zabbix-frontend-php zabbix-nginx-conf
+ZBX_VER='1:7.0.32-2+ubuntu26.04'   # mesmo valor do NODE 1 (3.1)
+apt-cache policy zabbix-server-pgsql | head -8
+apt-mark showhold
+apt-get -s install "zabbix-server-pgsql=$ZBX_VER" "zabbix-agent2=$ZBX_VER" \
+  "zabbix-frontend-php=$ZBX_VER" "zabbix-nginx-conf=$ZBX_VER" \
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl
 ```
+
+**Confirme na simulação** que nenhum componente importante será removido e que os pacotes `zabbix-*` vêm na versão `$ZBX_VER`. Versões diferentes de servidor no mesmo banco não são suportadas.
+
+```bash
+DEBIAN_FRONTEND=noninteractive apt-get install -y "zabbix-server-pgsql=$ZBX_VER" "zabbix-agent2=$ZBX_VER" \
+  "zabbix-frontend-php=$ZBX_VER" "zabbix-nginx-conf=$ZBX_VER" \
+  nginx php-fpm php-pgsql php-bcmath php-mbstring php-gd php-xml php-ldap php-curl php-intl
+apt-mark hold zabbix-server-pgsql zabbix-agent2 zabbix-frontend-php zabbix-nginx-conf
+```
+
+O `hold` impede que um `apt upgrade` atualize apenas um dos nós. Para atualizar o Zabbix, remova o `hold` (`apt-mark unhold ...`) e atualize **os dois nós** na mesma janela.
 
 > `zabbix-sql-scripts` **não é necessário** neste nó, pois o schema não será importado aqui.
 
