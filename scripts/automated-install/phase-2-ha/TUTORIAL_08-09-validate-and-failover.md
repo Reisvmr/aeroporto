@@ -268,6 +268,8 @@ ssh root@10.31.38.70 "systemctl start haproxy"
 
 ## ETAPA 3 — Teste de failover PostgreSQL (⚠️ impacto real)
 
+> ℹ️ Se o **VIP-DB** (TUTORIAL_02b) estiver implantado, siga a etapa 8 daquele tutorial: isolar o pg-01 **antes** de promover; o VIP migra sozinho para o pg-02 e as aplicações não precisam trocar `DBHost`. Sem o VIP-DB, após a promoção altere `DBHost` para `10.31.38.65` nos dois Zabbix Server, nos dois frontends, no Grafana e no AWX.
+
 > ⚠️ **Atenção:** Este teste causa interrupção real do banco. Execute em manutenção.
 
 ```bash

@@ -25,6 +25,7 @@
 | **VIP-Zabbix-Web** | **10.31.38.72**| **VIP acesso Zabbix Frontend**     | **2**  |
 | **VIP-Grafana**    | **10.31.38.73**| **VIP acesso Grafana**             | **2**  |
 | **VIP-AWX**        | **10.31.38.74**| **VIP acesso AWX**                 | **2**  |
+| VIP-PostgreSQL (proposto) | 10.31.38.75 (a confirmar) | VIP do primário PostgreSQL — ver TUTORIAL_02b | 1b |
 
 > 📌 **3 VIPs de serviço**, todos gerenciados pelo Keepalived (VRRP), migram automaticamente entre vip-01 e vip-02 em caso de falha:  
 > `10.31.38.72` (Zabbix) · `10.31.38.73` (Grafana) · `10.31.38.74` (AWX)  
